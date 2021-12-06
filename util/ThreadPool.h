@@ -92,7 +92,7 @@ private:
 };
 
 
-// if F return something
+// if F return something 线程池开始执行
 template <typename F, typename... Args, typename, typename >
 auto ThreadPool::Execute(F&& f, Args&&... args) -> Future<typename std::result_of<F (Args...)>::type> {
     using resultType = typename std::result_of<F (Args...)>::type;

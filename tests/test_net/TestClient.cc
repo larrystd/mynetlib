@@ -17,6 +17,7 @@ std::shared_ptr<ananas::Logger> logger;
 
 size_t OnMessage(ananas::Connection* conn, const char* data, size_t len) {
     ++ nowCount;
+    USR(logger) << data;
     if (nowCount == totalCount) {
         end.Now();
         USR(logger) << "Done OnResponse avg " << (totalCount * 0.1f / (end - start)) << " W/s";
@@ -37,6 +38,7 @@ void OnWriteComplete(ananas::Connection* conn) {
     //INF(logger) << "OnWriteComplete for " << conn->Identifier();
 }
 
+// 连接成功, 发送数据到server, 即tmp
 void OnConnect(ananas::Connection* conn) {
     INF(logger) << "OnConnect " << conn->Identifier();
 
@@ -56,7 +58,7 @@ void OnNewConnection(ananas::Connection* conn) {
     //conn->SetOnWriteComplete(OnWriteComplete);
 }
 
-
+// 连接失败
 void OnConnFail(ananas::EventLoop* loop, const ananas::SocketAddr& peer) {
     INF(logger) << "OnConnFail " << peer.GetPort();
 

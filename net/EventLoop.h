@@ -154,7 +154,7 @@ private:
 
     std::unique_ptr<internal::Poller> poller_;
 
-    std::shared_ptr<internal::PipeChannel> notifier_;
+    std::shared_ptr<internal::PipeChannel> notifier_;   // 明显这个是eventfd,能触发的
 
     internal::TimerManager timers_;
 
@@ -162,6 +162,8 @@ private:
     std::map<unsigned int, std::shared_ptr<internal::Channel> > channelSet_;
 
     std::mutex fctrMutex_;
+
+    // 要处理的函数任务
     std::vector<std::function<void ()> > functors_;
 
     int id_;
@@ -173,7 +175,7 @@ private:
     static rlim_t s_maxOpenFdPlus1;
 };
 
-
+// 处理定时器
 template <int RepeatCount, typename Duration, typename F, typename... Args>
 TimerId EventLoop::ScheduleAtWithRepeat(const TimePoint& triggerTime,
                                         const Duration& period,
@@ -237,16 +239,16 @@ EventLoop::Execute(F&& f, Args&&... args) {
 
         {
             std::unique_lock<std::mutex> guard(fctrMutex_);
-            functors_.emplace_back(std::move(func));
+            functors_.emplace_back(std::move(func));    // func暂且加入functors_
         }
 
-        notifier_->Notify();
+        notifier_->Notify();    // 写一些东西使fd可读
     }
 
     return future;
 }
 
-// F return void
+// F return void, loop执行函数
 template <typename F, typename... Args, typename >
 Future<void> EventLoop::Execute(F&& f, Args&&... args) {
 
@@ -254,7 +256,7 @@ Future<void> EventLoop::Execute(F&& f, Args&&... args) {
     static_assert(std::is_void<resultType>::value, "must be void");
 
     Promise<void> promise;
-    auto future = promise.GetFuture();
+    auto future = promise.GetFuture();  // 使用异步调用函数F
 
     if (InThisLoop()) {
         std::forward<F>(f)(std::forward<Args>(args)...);

@@ -136,11 +136,11 @@ private:
     void _StartWorkers();
 
     // The default loop for accept/connect, or as worker if empty worker pool
-    EventLoop base_;
+    EventLoop base_;    // application中有一个eventloop
 
     // worker thread pool
-    ThreadPool pool_;
-    std::vector<std::unique_ptr<EventLoop>> loops_;
+    ThreadPool pool_;   // 线程池
+    std::vector<std::unique_ptr<EventLoop>> loops_; // 子痫程的loops
     size_t numLoop_ {0};
     mutable std::atomic<size_t> currentLoop_ {0};
 

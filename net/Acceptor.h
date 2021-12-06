@@ -8,7 +8,7 @@
 namespace ananas {
 namespace internal {
 
-class Acceptor : public Channel {
+class Acceptor : public Channel {   // 继承自Channel的Acceptor, 是Channel对象
 public:
     explicit
     Acceptor(EventLoop* loop);

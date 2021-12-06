@@ -8,7 +8,7 @@ namespace ananas {
 
 namespace internal {
 
-PipeChannel::PipeChannel() {
+PipeChannel::PipeChannel() {    // 也就创建了管道fd, 通信管道
     int fd[2];
     int ret = ::pipe(fd);
     assert (ret == 0);

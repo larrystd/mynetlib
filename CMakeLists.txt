@@ -4,6 +4,8 @@ PROJECT(ANANAS)
 
 SET(CMAKE_CXX_STANDARD 14)
 
+SET(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/install)
+
 IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
     message("Detect linux platform")
 ELSEIF(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
@@ -12,7 +14,7 @@ ELSE()
     message(FATAL_ERROR "Only support linux or mac")
 ENDIF()
 
-OPTION(DEBUG "Debug or release" OFF)
+OPTION(DEBUG "Debug or release" ON)
 
 IF(DEBUG)
     SET(CMAKE_BUILD_TYPE "Debug")
@@ -48,5 +50,5 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
 ENDIF()
 
 SUBDIRS(tests)
-SUBDIRS(unittest)
+#SUBDIRS(unittest)
 SUBDIRS(examples)

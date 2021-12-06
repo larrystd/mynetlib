@@ -52,6 +52,8 @@ size_t Application::NumOfWorker() const {
     return 1 + numLoop_;
 }
 
+// 之前已经实现了sockfd的创建绑定和监听
+// 
 void Application::Run(int ac, char* av[]) {
     ANANAS_DEFER {
         if (onExit_)
@@ -71,8 +73,9 @@ void Application::Run(int ac, char* av[]) {
         }
     }
 
-    // start loops in thread pool
+    // start loops in thread pool, 在子线程中创建loop对象, 指针加入Loop队列
     _StartWorkers();
+    // run loop执行loop->run
     BaseLoop()->Run();
 
     printf("Stopped BaseEventLoop...\n");
@@ -106,6 +109,7 @@ void Application::SetOnExit(std::function<void ()> onexit) {
     onExit_ = std::move(onexit);
 }
 
+// application监听, 首先创建一个loop, 执行loop->listen
 void Application::Listen(const SocketAddr& listenAddr,
                          NewTcpConnCallback cb,
                          BindCallback bfcb) {
@@ -120,7 +124,7 @@ void Application::Listen(const SocketAddr& listenAddr,
 
 void Application::Listen(const char* ip,
                          uint16_t hostPort,
-                         NewTcpConnCallback cb,
+                         NewTcpConnCallback cb, // 设置了NewTcpConnCallback, 参数为void (Connection* )
                          BindCallback bfcb) {
     SocketAddr addr(ip, hostPort);
     Listen(addr, std::move(cb), std::move(bfcb));
@@ -201,12 +205,15 @@ void Application::_StartWorkers() {
 
     pool_.SetNumOfThreads(numLoop_);
     for (size_t i = 0; i < numLoop_; ++i) {
+        // 线程池里的线程执行, 1创建loop 2. 将loop指针加入到loops
         pool_.Execute([this, &mutex, &cond]() {
             EventLoop* loop(new EventLoop);
 
             {
                 std::unique_lock<std::mutex> guard(mutex);
+                // 这里的loops_是共享对象
                 loops_.push_back(std::unique_ptr<EventLoop>(loop));
+                // loops_线程池的对象均已创建唤醒主线程返回 
                 if (loops_.size() == numLoop_)
                     cond.notify_one();
             }

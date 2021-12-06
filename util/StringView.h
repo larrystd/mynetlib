@@ -10,6 +10,8 @@
 
 namespace ananas {
 
+// stringView不是C++标准库string那种vector<char>, 而只是维护了const char*指针和len的高效率
+// 毕竟string其实是动态数据, 因此要先将传入的string construct到内存中
 class StringView {
 public:
     using value_type = char;

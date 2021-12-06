@@ -64,12 +64,14 @@ bool EventLoop::Listen(const char* ip,
     return Listen(addr, std::move(newConnCallback));
 }
 
+// eventloop的监听, 先创建一个Acceptor, 配置回调函数和bind
+// 事实上再acceptor对象中创建sockfd, 绑定地址并监听
 bool EventLoop::Listen(const SocketAddr& listenAddr,
                        NewTcpConnCallback newConnCallback) {
     using internal::Acceptor;
 
-    auto s = std::make_shared<Acceptor>(this);
-    s->SetNewConnCallback(std::move(newConnCallback));
+    auto s = std::make_shared<Acceptor>(this);// 创建Accptor对象, 指针用shared_ptr维护
+    s->SetNewConnCallback(std::move(newConnCallback));  // 设置连接回调
     if (!s->Bind(listenAddr))
         return false;
 
@@ -129,7 +131,7 @@ bool EventLoop::Connect(const SocketAddr& dst,
                         EventLoop* dstLoop) {
     using internal::Connector;
 
-    auto cli = std::make_shared<Connector>(this);
+    auto cli = std::make_shared<Connector>(this);   // 尝试连接
     cli->SetFailCallback(cfcb);
     cli->SetNewConnCallback(nccb);
 
@@ -146,7 +148,7 @@ std::atomic<int> EventLoop::s_evId {0};
 
 rlim_t EventLoop::s_maxOpenFdPlus1 = ananas::GetMaxOpenFd();
 
-bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {
+bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {  // 注册一个events和Channel
     if (events == 0)
         return false;
 
@@ -175,7 +177,7 @@ bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {
     src->SetUniqueId(s_id);
     ANANAS_INF << "Register " << s_id << " to me " << pthread_self();
 
-    if (poller_->Register(src->Identifier(), events, src.get()))
+    if (poller_->Register(src->Identifier(), events, src.get()))    // 注册Channel到poller_中
         return channelSet_.insert({src->GetUniqueId(), src}).second;
 
     return false;
@@ -208,13 +210,14 @@ void EventLoop::Run() {
     const DurationMs kDefaultPollTime(10);
     const DurationMs kMinPollTime(1);
 
-    Register(internal::eET_Read, notifier_);
+    Register(internal::eET_Read, notifier_);   // notifier channel注册可读到poller中, 这个用来唤醒epoll_wait 
 
+    // 一个loop循环
     while (!Application::Instance().IsExit()) {
         auto timeout = std::min(kDefaultPollTime, timers_.NearestTimer());
         timeout = std::max(kMinPollTime, timeout);
 
-        _Loop(timeout);
+        _Loop(timeout);// 这个思想和redis类似, 在timeout时间下执行loop循环, 等超时了执行定时器
     }
 
     for (auto& kv : channelSet_) {
@@ -228,9 +231,9 @@ void EventLoop::Run() {
 
 bool EventLoop::_Loop(DurationMs timeout) {
     ANANAS_DEFER {
-        timers_.Update();
+        timers_.Update();   // 优先处理定时器, 保证不超时
 
-        // do not block
+        // do not block, 再处理任务队列的函数
         if (fctrMutex_.try_lock()) {
             // Use tmp : if f add callback to functors_
             decltype(functors_) funcs;
@@ -247,20 +250,23 @@ bool EventLoop::_Loop(DurationMs timeout) {
         return false;
     }
 
+    // muduo是把定时器timefd和pollfd统一处理, 这里只处理pollfd, 为了不超定时器的时间, 等之前设置epoll_wait最长等待时间不超过定时器最早时间
     const int ready = poller_->Poll(static_cast<int>(channelSet_.size()),
-                                    static_cast<int>(timeout.count()));
+                                    static_cast<int>(timeout.count())); // 等待活跃channel, 设置超时时间为timeout
     if (ready < 0)
         return false;
 
+    
     const auto& fired = poller_->GetFiredEvents();
 
     // Consider stale event, DO NOT unregister another socket in event handler!
 
-    std::vector<std::shared_ptr<internal::Channel>> sources(ready);
+    std::vector<std::shared_ptr<internal::Channel>> sources(ready); // 处理活跃的events, 
     for (int i = 0; i < ready; ++ i) {
-        auto src = (internal::Channel* )fired[i].userdata;
+        auto src = (internal::Channel* )fired[i].userdata;  // src是一个channel
         sources[i] = src->shared_from_this();
 
+        // 执行对应的回调函数
         if (fired[i].events & internal::eET_Read) {
             if (!src->HandleReadEvent()) {
                 src->HandleErrorEvent();

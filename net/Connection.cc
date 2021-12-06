@@ -90,6 +90,7 @@ int Connection::Identifier() const {
     return localSock_;
 }
 
+// 用户发送信息传送到, fd可读, 调用这个函数
 bool Connection::HandleReadEvent() {
     if (state_ != State::eS_Connected) {
         ANANAS_ERR << localSock_ << "[fd] HandleReadEvent error state:" << state_;
@@ -107,6 +108,7 @@ bool Connection::HandleReadEvent() {
 
     bool busy = false;
     while (true) {
+        // 首先读取fd的信息到缓冲区recvBuf_
         recvBuf_.AssureSpace(8 * 1024);
         int bytes = ::recv(localSock_, recvBuf_.WriteAddr(), recvBuf_.WritableSize(), 0);
         if (bytes == kError) {
@@ -136,9 +138,11 @@ bool Connection::HandleReadEvent() {
             return false;
         }
 
+        // 然后调用Produce设置writepos更新可写位置
         recvBuf_.Produce(static_cast<size_t>(bytes));
         while (recvBuf_.ReadableSize() >= minPacketSize_) {
             size_t bytes = 0;
+            // 3. 调用onMessage_执行处理函数
             if (onMessage_) {
                 bytes = onMessage_(this,
                                    recvBuf_.ReadAddr(),
@@ -152,6 +156,7 @@ bool Connection::HandleReadEvent() {
             if (bytes == 0) {
                 break;
             } else {
+                // 4调用 Consume更新readpos位置
                 recvBuf_.Consume(bytes);
                 busy = true;
             }
@@ -490,6 +495,7 @@ void Connection::SetBatchSend(bool batch) {
     batchSend_ = batch;
 }
 
+// 设置用户调用的conn回调onConnect_
 void Connection::SetOnConnect(std::function<void (Connection* )> cb) {
     onConnect_ = std::move(cb);
 }
@@ -498,16 +504,18 @@ void Connection::SetOnDisconnect(std::function<void (Connection* )> cb) {
     onDisconnect_ = std::move(cb);
 }
 
+// 用户设置的信息处理函数回调
 void Connection::SetOnMessage(TcpMessageCallback cb) {
     onMessage_ = std::move(cb);
 }
 
+// 新链接回调函数
 void Connection::_OnConnect() {
     if (state_ != State::eS_Connected)
         return;
 
     if (onConnect_)
-        onConnect_(this);
+        onConnect_(this);   // 调用onConnect_, 用户注册的回调
 }
 
 void Connection::SetOnWriteComplete(TcpWriteCompleteCallback wccb) {

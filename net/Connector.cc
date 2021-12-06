@@ -38,6 +38,7 @@ void Connector::SetFailCallback(TcpConnFailCallback cb) {
     onConnectFail_ = std::move(cb);
 }
 
+// 客户端执行connect连接某服务端
 bool Connector::Connect(const SocketAddr& addr, DurationMs timeout, EventLoop* dstLoop) {
     if (!addr.IsValid())
         return false;

@@ -29,7 +29,8 @@ void Acceptor::SetNewConnCallback(NewTcpConnCallback cb) {
     newConnCallback_ = std::move(cb);
 }
 
-bool Acceptor::Bind(const SocketAddr& addr) {
+// 创建socketfd. 绑定地址并监听
+bool Acceptor::Bind(const SocketAddr& addr) {   // 事实是创建一个socket并绑定addr
     if (!addr.IsValid())
         return false;
 
@@ -64,7 +65,7 @@ bool Acceptor::Bind(const SocketAddr& addr) {
         return false;
     }
 
-    if (!loop_->Register(eET_Read, this->shared_from_this()))
+    if (!loop_->Register(eET_Read, this->shared_from_this()))   // Acception是一种Channel, 将该Channel注册为可读eET_Read
         return false;
 
     ANANAS_INF << "Create listen socket " << localSock_
@@ -73,24 +74,26 @@ bool Acceptor::Bind(const SocketAddr& addr) {
 }
 
 int Acceptor::Identifier() const {
-    return localSock_;
+    return localSock_;  // 返回localSock_维护的fd
 }
 
-bool Acceptor::HandleReadEvent() {
+bool Acceptor::HandleReadEvent() {  // 处理可读回调函数， 即有新连接到到来。先用connfd封装新连接connection, 再将connection注册到poller, 最后执行onConnect回调
     while (true) {
-        int connfd = _Accept();
-        if (connfd != kInvalid) {
+        int connfd = _Accept(); // 执行accept获得connfd
+        if (connfd != kInvalid) {   // connfd有效
             auto loop = Application::Instance().Next();
+            // 将执行conn->_OnConnect()
             auto func = [loop, newCb = newConnCallback_, connfd, peer = peer_]() {
-                auto conn(std::make_shared<Connection>(loop));
-                conn->Init(connfd, peer);
-                if (loop->Register(eET_Read, conn)) {
-                    newCb(conn.get());
-                    conn->_OnConnect();
+                auto conn(std::make_shared<Connection>(loop));  // 基于loop创建connection对象
+                conn->Init(connfd, peer);   // 用connfd初始化conn
+                if (loop->Register(eET_Read, conn)) {   // 注册新连接到Poll
+                    newCb(conn.get());  // 新连接回调函数执行(这里面会设置信息回调)
+                    conn->_OnConnect(); // conn执行_OnConnect()回调函数
                 } else {
                     ANANAS_ERR << "Failed to register socket " << conn->Identifier();
                 }
             };
+            // 执行func
             loop->Execute(std::move(func));
         } else {
             bool goAhead = false;
@@ -148,7 +151,7 @@ void Acceptor::HandleErrorEvent() {
     loop_->Unregister(eET_Read, shared_from_this());
 }
 
-int Acceptor::_Accept() {
+int Acceptor::_Accept() {   // 
     socklen_t addrLength = sizeof peer_;
     return ::accept(localSock_, (struct sockaddr *)&peer_, &addrLength);
 }

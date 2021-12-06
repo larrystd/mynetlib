@@ -17,6 +17,7 @@ enum EventType {
 };
 
 ///@brief Event source base class.
+// 一个Channel
 class Channel : public std::enable_shared_from_this<Channel> {
 public:
     ///@brief Constructor, printf is for debug, you can comment it
