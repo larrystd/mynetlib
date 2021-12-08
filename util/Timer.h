@@ -12,7 +12,7 @@
 namespace ananas {
 
 using DurationMs = std::chrono::milliseconds;
-using TimePoint = std::chrono::steady_clock::time_point;
+using TimePoint = std::chrono::steady_clock::time_point;    // 时间点class
 using TimerId = std::shared_ptr<std::pair<TimePoint, unsigned int> >;
 
 constexpr int kForever = -1;
@@ -108,8 +108,9 @@ private:
         int count_;
     };
 
-    std::multimap<TimePoint, Timer> timers_;
+    std::multimap<TimePoint, Timer> timers_;    // 定时器, 通过multimap, 根据TimePoint时间点排序
 
+    // multimap 可以保存重复key, 不支持operator[]因为有重复key
     friend class Timer;
 
     // not thread-safe, but who cares?

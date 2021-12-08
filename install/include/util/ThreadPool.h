@@ -6,7 +6,7 @@
 #include <memory>
 #include <mutex>
 #include <condition_variable>
-#include "ananas/future/Future.h"
+#include "future/Future.h"
 
 ///@file ThreadPool.h
 ///@brief A powerful ThreadPool implementation with Future interface.

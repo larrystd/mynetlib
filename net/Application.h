@@ -12,7 +12,7 @@
 #include "ananas/util/Timer.h"
 #include "ananas/util/ThreadPool.h"
 
-///@brief Namespace ananas
+// Application, 起到server的作用
 namespace ananas {
 /// @file Application.h
 
@@ -36,7 +36,7 @@ public:
     ///@brief Run application
     ///
     /// It's a infinite loop, until SIGINT received.
-    void Run(int argc, char* argv[]);
+    void Run(int argc, char* argv[]);   // 运行
     ///@brief Exit application
     void Exit();
     ///@brief Is application exiting?
@@ -131,15 +131,15 @@ public:
     size_t NumOfWorker() const;
 
 private:
-    Application();
+    Application();  // 单例模式
 
     void _StartWorkers();
 
     // The default loop for accept/connect, or as worker if empty worker pool
-    EventLoop base_;    // application中有一个eventloop
+    EventLoop base_;    // application具有一个base eventloop, 主eventloop
 
     // worker thread pool
-    ThreadPool pool_;   // 线程池
+    ThreadPool pool_;   // 线程池, 分配线程
     std::vector<std::unique_ptr<EventLoop>> loops_; // 子痫程的loops
     size_t numLoop_ {0};
     mutable std::atomic<size_t> currentLoop_ {0};
@@ -157,7 +157,7 @@ private:
     static void _DefaultBindCallback(bool succ, const SocketAddr& );
 };
 
-} // end namespace ananas
+} // namespace ananas
 
 #endif
 

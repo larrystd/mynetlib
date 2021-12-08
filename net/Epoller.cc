@@ -13,7 +13,7 @@ namespace internal {
 namespace Epoll {
 bool ModSocket(int epfd, int socket, uint32_t events, void* ptr);
 
-bool AddSocket(int epfd, int socket, uint32_t events, void* ptr) {
+bool AddSocket(int epfd, int socket, uint32_t events, void* ptr) {  // epoll注册socket
     if (socket < 0)
         return false;
 
@@ -21,12 +21,12 @@ bool AddSocket(int epfd, int socket, uint32_t events, void* ptr) {
     ev.data.ptr= ptr;
     ev.events = 0;
 
-    if (events & eET_Read)
+    if (events & eET_Read)  // 设置事件
         ev.events |= EPOLLIN;
     if (events & eET_Write)
         ev.events |= EPOLLOUT;
 
-    return 0 == epoll_ctl(epfd, EPOLL_CTL_ADD, socket, &ev);
+    return 0 == epoll_ctl(epfd, EPOLL_CTL_ADD, socket, &ev);    // epoll_ctl注册socket, event到 epfd
 }
 
 bool DelSocket(int epfd, int socket) {
@@ -37,7 +37,7 @@ bool DelSocket(int epfd, int socket) {
     return 0 == epoll_ctl(epfd, EPOLL_CTL_DEL, socket, &dummy) ;
 }
 
-bool ModSocket(int epfd, int socket, uint32_t events, void* ptr) {
+bool ModSocket(int epfd, int socket, uint32_t events, void* ptr) {  // 修改socket, event类型epoll_ctl
     if (socket < 0)
         return false;
 
@@ -56,7 +56,7 @@ bool ModSocket(int epfd, int socket, uint32_t events, void* ptr) {
 
 
 Epoller::Epoller() {
-    multiplexer_ = ::epoll_create(512);
+    multiplexer_ = ::epoll_create(512); // 创建epoll_create
     ANANAS_DBG << "create epoll: " << multiplexer_;
 }
 
@@ -67,7 +67,7 @@ Epoller::~Epoller() {
     }
 }
 
-bool Epoller::Register(int fd, int events, void* userPtr) {
+bool Epoller::Register(int fd, int events, void* userPtr) { // 新增socket于epoll中
     if (Epoll::AddSocket(multiplexer_, fd, events, userPtr))
         return true;
 
@@ -90,23 +90,23 @@ bool Epoller::Modify(int fd, int events, void* userPtr) {
 }
 
 
-int Epoller::Poll(size_t maxEvent, int timeoutMs) {
+int Epoller::Poll(size_t maxEvent, int timeoutMs) { // 获取活跃事件
     if (maxEvent == 0)
         return 0;
 
     while (events_.size() < maxEvent)
         events_.resize(2 * events_.size() + 1);
 
-    int nFired = TEMP_FAILURE_RETRY(::epoll_wait(multiplexer_, &events_[0], maxEvent, timeoutMs));
+    int nFired = TEMP_FAILURE_RETRY(::epoll_wait(multiplexer_, &events_[0], maxEvent, timeoutMs));  // 活跃的事件,&events_[0]是事件列表第一个元素的地址 
     if (nFired == -1 && errno != EINTR && errno != EWOULDBLOCK)
         return -1;
 
-    auto& events = firedEvents_;
+    auto& events = firedEvents_;    // events是firedEvents_的引用
     if (nFired > 0)
         events.resize(nFired);
 
     for (int i = 0; i < nFired; ++ i) {
-        FiredEvent& fired = events[i];
+        FiredEvent& fired = events[i];  // fired是events[]的引用, 这一切都是在修改std::vector<FiredEvent> firedEvents_;
         fired.events   = 0;
         fired.userdata = events_[i].data.ptr;
 
@@ -123,8 +123,8 @@ int Epoller::Poll(size_t maxEvent, int timeoutMs) {
     return nFired;
 }
 
-} // end namespace internal
-} // end namespace ananas
+} // namespace internal
+} // namespace ananas
 
 #endif
 

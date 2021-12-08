@@ -16,6 +16,7 @@ const int kTimeout =  0;
 const int kError = -1;
 const int kEof = -2;
 
+// 对socket的操作函数
 int CreateUDPSocket() {
     return ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 }
@@ -174,5 +175,5 @@ std::string ConvertIp(const char* ip) {
     return ip;
 }
 
-} // end namespace ananas
+} // namespace ananas
 

@@ -5,7 +5,7 @@
 
 namespace ananas {
 
-constexpr StringView::size_type StringView::npos;
+constexpr StringView::size_type StringView::npos;   // string的结束
 
 StringView::StringView() :
     StringView(nullptr, 0) {
@@ -70,13 +70,15 @@ void StringView::RemoveSuffix(size_t n) {
     len_ -= n;
 }
 
+// swap
 void StringView::Swap(StringView& other) {
     if (this != &other) {
-        std::swap(this->data_, other.data_);
+        std::swap(this->data_, other.data_);    // 这里swap把右值引用赋给一个左值, 等价于把右值赋给左值
         std::swap(this->len_, other.len_);
     }
 }
 
+// 实现Substr, 重新构造StringView
 StringView StringView::Substr(size_type pos, size_type count) const {
     return StringView(data_ + pos, std::min(count, Size() - count));
 }

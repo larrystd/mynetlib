@@ -37,7 +37,7 @@ Application::~Application() {
 
 Application& Application::Instance() {
     static Application app;
-    return app;
+    return app; // 一个Application实例
 }
 
 void Application::SetNumOfWorker(size_t num) {
@@ -53,8 +53,7 @@ size_t Application::NumOfWorker() const {
 }
 
 // 之前已经实现了sockfd的创建绑定和监听
-// 
-void Application::Run(int ac, char* av[]) {
+void Application::Run(int ac, char* av[]) { // 运行server
     ANANAS_DEFER {
         if (onExit_)
             onExit_();
@@ -74,9 +73,8 @@ void Application::Run(int ac, char* av[]) {
     }
 
     // start loops in thread pool, 在子线程中创建loop对象, 指针加入Loop队列
-    _StartWorkers();
-    // run loop执行loop->run
-    BaseLoop()->Run();
+    _StartWorkers();    // 创建线程池的线程
+    BaseLoop()->Run();  // 主线程执行loop()事件循环
 
     printf("Stopped BaseEventLoop...\n");
 
@@ -114,9 +112,9 @@ void Application::Listen(const SocketAddr& listenAddr,
                          NewTcpConnCallback cb,
                          BindCallback bfcb) {
     auto loop = BaseLoop();
-    loop->Execute([loop, listenAddr, cb, bfcb]() {
-        if (!loop->Listen(listenAddr, std::move(cb)))
-            bfcb(false, listenAddr);
+    loop->Execute([loop, listenAddr, cb, bfcb]() {  
+        if (!loop->Listen(listenAddr, std::move(cb)))   // 执行了create, bind, listen
+            bfcb(false, listenAddr);    // bindcallback
         else
             bfcb(true, listenAddr);
     });
@@ -185,7 +183,7 @@ void Application::Connect(const char* ip,
 }
 
 
-EventLoop* Application::Next() {
+EventLoop* Application::Next() {    // 获取全局loops列表的下一个可用loops
     if (state_ != State::eS_Started)
         return BaseLoop();
 
@@ -203,9 +201,9 @@ void Application::_StartWorkers() {
     std::mutex mutex;
     std::condition_variable cond;
 
-    pool_.SetNumOfThreads(numLoop_);
+    pool_.SetNumOfThreads(numLoop_);    // 线程池设置大小
     for (size_t i = 0; i < numLoop_; ++i) {
-        // 线程池里的线程执行, 1创建loop 2. 将loop指针加入到loops
+        // 线程池里的线程执行, 1.创建loop 2.将loop指针加入全局变量Application.loops列表
         pool_.Execute([this, &mutex, &cond]() {
             EventLoop* loop(new EventLoop);
 
@@ -215,22 +213,22 @@ void Application::_StartWorkers() {
                 loops_.push_back(std::unique_ptr<EventLoop>(loop));
                 // loops_线程池的对象均已创建唤醒主线程返回 
                 if (loops_.size() == numLoop_)
-                    cond.notify_one();
+                    cond.notify_one();  // 唤醒等待的线程(main线程)
             }
 
-            loop->Run();
+            loop->Run();    // 子线程执行loop循环
         });
     }
-
+    // 主线程执行
     std::unique_lock<std::mutex> guard(mutex);
     cond.wait(guard, [this] () {
-        return loops_.size() == numLoop_;
+        return loops_.size() == numLoop_;   // 等待子线程创建完毕
     });
 
     state_ = State::eS_Started;
 }
 
-Application::Application() :
+Application::Application() :    // 构造函数
     state_ {State::eS_None} {
     InitSignal();
 
@@ -249,5 +247,5 @@ void Application::_DefaultBindCallback(bool succ, const SocketAddr& listenAddr) 
     }
 }
 
-} // end namespace ananas
+} // namespace ananas
 

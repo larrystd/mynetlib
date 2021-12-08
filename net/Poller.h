@@ -9,47 +9,39 @@ namespace ananas {
 ///@brief namespace internal, not exposed to user.
 namespace internal {
 
-enum EventType {
+enum EventType {    // 事件类型
     eET_None  = 0,
     eET_Read  = 0x1 << 0,
     eET_Write = 0x1 << 1,
     eET_Error = 0x1 << 2,
 };
 
-///@brief Event source base class.
-// 一个Channel
-class Channel : public std::enable_shared_from_this<Channel> {
+class Channel : public std::enable_shared_from_this<Channel> {  // 继承std::enable_shared_from_this, 可以用shared_from_this了
 public:
-    ///@brief Constructor, printf is for debug, you can comment it
     Channel() {
         printf("New channel %p\n", (void*)this);
     }
-    ///@brief Destructor, printf is for debug, you can comment it
-    virtual ~Channel() {
+    virtual ~Channel() {    // 虚析构函数
         printf("Delete channel %p\n", (void*)this);
     }
 
-    Channel(const Channel& ) = delete;
+    Channel(const Channel& ) = delete;  // 不能拷贝或者赋值
     void operator=(const Channel& ) = delete;
 
-    ///@brief Return socket fd for sockets, just for debug
-    virtual int Identifier() const = 0;
+    virtual int Identifier() const = 0; // 返回Channel的sockfd
 
     ///@brief The unique id, it'll not repeat in whole process.
     unsigned int GetUniqueId() const {
         return unique_id_;
     }
-
     ///@brief Set the unique id, it's called by library.
     void SetUniqueId(unsigned int id) {
         unique_id_ = id;
     }
 
-    ///@brief When read event occurs
+    // 回调函数, 也是虚的函数
     virtual bool HandleReadEvent() = 0;
-    ///@brief When write event occurs
     virtual bool HandleWriteEvent() = 0;
-    ///@brief When error event occurs
     virtual void HandleErrorEvent() = 0;
 
 private:
@@ -57,7 +49,7 @@ private:
 };
 
 
-struct FiredEvent {
+struct FiredEvent { // 过期事件
     int   events;
     void* userdata;
 
@@ -65,30 +57,31 @@ struct FiredEvent {
     }
 };
 
-class Poller {
-public:
+class Poller {  // 负责poll连接
+ public:
     Poller() : multiplexer_(-1) {
-    }
 
+    }
     virtual ~Poller() {
+
     }
 
-    virtual bool Register(int fd, int events, void* userPtr) = 0;
-    virtual bool Modify(int fd, int events, void* userPtr) = 0;
+    virtual bool Register(int fd, int events, void* userPtr) = 0;   // 注册fd到poll
+    virtual bool Modify(int fd, int events, void* userPtr) = 0; // 修改fd的状态
     virtual bool Unregister(int fd, int events) = 0;
 
-    virtual int Poll(std::size_t maxEv, int timeoutMs) = 0;
+    virtual int Poll(std::size_t maxEv, int timeoutMs) = 0; // 获取活跃连接
     const std::vector<FiredEvent>& GetFiredEvents() const {
         return firedEvents_;
     }
 
-protected:
+ protected:
     int multiplexer_;
-    std::vector<FiredEvent>  firedEvents_;
+    std::vector<FiredEvent> firedEvents_;   // 活跃的事件列表
 };
 
-} // end namespace internal
-} // end namespace ananas
+} // namespace internal
+} // namespace ananas
 
 #endif
 

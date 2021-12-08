@@ -122,7 +122,7 @@ void Logger::_CloseLogFile() {
 // TODO config
 static const int kFlushThreshold = 2 * 1024 * 1024;
 
-void Logger::Flush(enum LogLevel level) {
+void Logger::Flush(enum LogLevel level) {   // flush到持久化
     assert (level == curLevel_);
 
     if (IsLevelForbid(curLevel_)) {

@@ -30,13 +30,13 @@ SUBDIRS(net)
 SUBDIRS(util)
 SUBDIRS(future)
 
-OPTION(USE_SSL "Use ssl or not" OFF)
+OPTION(USE_SSL "Use ssl or not" ON)
 IF(USE_SSL)
     ADD_DEFINITIONS(-DANANAS_DEBUG=1)
     SUBDIRS(ssl)
 ENDIF()
 
-OPTION(USE_PROTO "Use google protobuf or not" OFF)
+OPTION(USE_PROTO "Use google protobuf or not" ON)
 
 FIND_PACKAGE(Protobuf)
 IF(PROTOBUF_FOUND)

@@ -6,6 +6,13 @@
 #include <vector>
 
 #include "gtest/gtest.h"
+using ::testing::EmptyTestEventListener;
+using ::testing::InitGoogleTest;
+using ::testing::Test;
+using ::testing::TestEventListeners;
+using ::testing::TestInfo;
+using ::testing::TestPartResult;
+using ::testing::UnitTest;
 
 using ananas::ThreadPool;
 
@@ -108,3 +115,18 @@ TEST_F(ThreadPoolTest, join_test) {
   ASSERT_THROW(pool_.Execute(&ThreadPoolTest::LongTask, this),
                std::runtime_error);
 }
+
+
+int main(int argc, char **argv) {
+  InitGoogleTest(&argc, argv);
+
+  bool check_for_leaks = false;
+  if (argc > 1 && strcmp(argv[1], "--check_for_leaks") == 0 )
+    check_for_leaks = true;
+  else
+    printf("%s\n", "Run this program with --check_for_leaks to enable "
+           "custom leak checking in the tests.");
+
+  return RUN_ALL_TESTS();
+}
+

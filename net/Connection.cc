@@ -1,3 +1,5 @@
+#include "Connection.h"
+
 #include <cassert>
 
 #include <errno.h>
@@ -5,20 +7,19 @@
 #include <sys/uio.h>
 
 #include "EventLoop.h"
-#include "Connection.h"
 #include "AnanasDebug.h"
 #include "util/Util.h"
 
 namespace ananas {
 
-using internal::eET_Read;
+using internal::eET_Read;   // 事件类型
 using internal::eET_Write;
 
 Connection::Connection(EventLoop* loop) :
     loop_(loop),
     localSock_(kInvalid),
     minPacketSize_(1) {
-}
+}   // 构造函数
 
 Connection::~Connection() {
     if (localSock_ != kInvalid) {
@@ -30,27 +31,23 @@ Connection::~Connection() {
 bool Connection::Init(int fd, const SocketAddr& peer) {
     if (fd == kInvalid)
         return false;
-
-    localSock_ = fd;
-    SetNonBlock(localSock_);
-
-    peer_ = peer;
-
-    assert (state_ == State::eS_None);
-    state_ = State::eS_Connected;
+    localSock_ = fd;    // Connection维护的fd
+    SetNonBlock(localSock_);    // 非阻塞fd
+    peer_ = peer;   // 对方SocketAddr
+    assert(state_ == State::eS_None);   // release式一般没有assert
+    state_ = State::eS_Connected;   // 连接状态
     return true;
 }
 
 void Connection::ActiveClose() {
     if (localSock_ == kInvalid)
         return;
-
-    if (sendBuf_.Empty()) {
-        Shutdown(ShutdownMode::eSM_Both);
+    if (sendBuf_.Empty()) { // 发送缓冲为空
+        Shutdown(ShutdownMode::eSM_Both);   // shutdown
         state_ = State::eS_ActiveClose;
-    } else {
-        state_ = State::eS_CloseWaitWrite;
-        Shutdown(ShutdownMode::eSM_Read); // disable read
+    }else {
+        state_ = State::eS_CloseWaitWrite;  // 要把缓冲区内容写完
+        ShutdownMode(ShutdownMode::eSM_Read);
     }
 
     loop_->Modify(eET_Write, shared_from_this());
@@ -59,13 +56,13 @@ void Connection::ActiveClose() {
 void Connection::Shutdown(ShutdownMode mode) {
     switch (mode) {
     case ShutdownMode::eSM_Read:
-        ::shutdown(localSock_, SHUT_RD);
+        ::shutdown(localSock_, SHUT_RD);    // 关闭
         break;
 
     case ShutdownMode::eSM_Write:
         if (!sendBuf_.Empty()) {
             ANANAS_WRN << localSock_ << " shutdown write, but still has data to send";
-            sendBuf_.Clear();
+            sendBuf_.Clear();   // 直接抛弃剩下要发送的数据
         }
 
         ::shutdown(localSock_, SHUT_WR);
@@ -86,11 +83,11 @@ void Connection::SetNodelay(bool enable) {
     ananas::SetNodelay(localSock_, enable);
 }
 
-int Connection::Identifier() const {
+int Connection::Identifier() const {    // Connection维护的fd
     return localSock_;
 }
 
-// 用户发送信息传送到, fd可读, 调用这个函数
+// 用户发送信息传送到, fd可读, 自动调用这个函数
 bool Connection::HandleReadEvent() {
     if (state_ != State::eS_Connected) {
         ANANAS_ERR << localSock_ << "[fd] HandleReadEvent error state:" << state_;
@@ -142,7 +139,8 @@ bool Connection::HandleReadEvent() {
         recvBuf_.Produce(static_cast<size_t>(bytes));
         while (recvBuf_.ReadableSize() >= minPacketSize_) {
             size_t bytes = 0;
-            // 3. 调用onMessage_执行处理函数
+            
+            // 3. 调用onMessage_信息回调函数执行处理函数, 该函数是用户自定义的逻辑。onMessage已经包含了send data
             if (onMessage_) {
                 bytes = onMessage_(this,
                                    recvBuf_.ReadAddr(),
@@ -156,7 +154,7 @@ bool Connection::HandleReadEvent() {
             if (bytes == 0) {
                 break;
             } else {
-                // 4调用 Consume更新readpos位置
+                // 4. send data之后调用 Consume更新readpos位置
                 recvBuf_.Consume(bytes);
                 busy = true;
             }
@@ -170,11 +168,11 @@ bool Connection::HandleReadEvent() {
 }
 
 
-int Connection::_Send(const void* data, size_t len) {
+int Connection::_Send(const void* data, size_t len) {   // 发送数据
     if (len == 0)
         return 0;
 
-    int bytes = ::send(localSock_, data, len, 0);
+    int bytes = ::send(localSock_, data, len, 0);   // 将数据发送到localSock_ fd中
     if (kError == bytes) {
         if (EAGAIN == errno || EWOULDBLOCK == errno)
             bytes = 0;
@@ -196,7 +194,7 @@ void ConsumeBufferVectors(BufferVector& , size_t );
 void CollectBuffer(const std::vector<iovec>& , size_t , BufferVector& );
 }
 
-bool Connection::HandleWriteEvent() {
+bool Connection::HandleWriteEvent() {   // Connection可写回调, 水平触发条件下fd缓冲有空间时会自动触发可写事件
 
     if (state_ != State::eS_Connected &&
         state_ != State::eS_CloseWaitWrite) {
@@ -208,7 +206,7 @@ bool Connection::HandleWriteEvent() {
 
     size_t expectSend = 0;
     std::vector<iovec> iovecs;
-    for (auto& e : sendBuf_) {
+    for (auto& e : sendBuf_) {  // 将sendBuf_的数据包装成块数据发送
         assert (!e.IsEmpty());
 
         iovec ivc;
@@ -219,7 +217,7 @@ bool Connection::HandleWriteEvent() {
         expectSend += e.ReadableSize();
     }
 
-    int ret = WriteV(localSock_, iovecs);
+    int ret = WriteV(localSock_, iovecs);   // iovecs块数据发送到Connection fd中
     if (ret == kError) {
         ANANAS_ERR << localSock_ << " HandleWriteEvent ERROR ";
         Shutdown(ShutdownMode::eSM_Both);
@@ -247,7 +245,7 @@ bool Connection::HandleWriteEvent() {
     return true;
 }
 
-void  Connection::HandleErrorEvent() {
+void  Connection::HandleErrorEvent() {  // 错误事件回调函数
     ANANAS_ERR << localSock_ << " HandleErrorEvent " << state_;
 
     switch (state_) {
@@ -272,7 +270,7 @@ void  Connection::HandleErrorEvent() {
     loop_->Unregister(eET_Read | eET_Write, shared_from_this());
 }
 
-bool Connection::SafeSend(const void* data, std::size_t size) {
+bool Connection::SafeSend(const void* data, std::size_t size) { // 安全的发送, 也是通过Connection所属的loop线程单线程发送
     if (loop_->InThisLoop())
         return this->SendPacket(data, size);
     else
@@ -385,7 +383,7 @@ int WriteV(int sock, const std::vector<iovec>& buffers) {
     return sentBytes;
 }
 
-void ConsumeBufferVectors(BufferVector& buffers, size_t toSkippedBytes) {
+void ConsumeBufferVectors(BufferVector& buffers, size_t toSkippedBytes) {   // 消费Buffer
     size_t skippedVecs = 0;
     for (auto& e : buffers) {
         assert (e.ReadableSize() > 0);
@@ -504,12 +502,12 @@ void Connection::SetOnDisconnect(std::function<void (Connection* )> cb) {
     onDisconnect_ = std::move(cb);
 }
 
-// 用户设置的信息处理函数回调
+// 设置信息处理函数回调
 void Connection::SetOnMessage(TcpMessageCallback cb) {
     onMessage_ = std::move(cb);
 }
 
-// 新链接回调函数
+// 新连接回调函数
 void Connection::_OnConnect() {
     if (state_ != State::eS_Connected)
         return;
@@ -534,5 +532,5 @@ size_t Connection::GetMinPacketSize() const {
     return minPacketSize_;
 }
 
-} // end namespace ananas
+} // namespace ananas
 

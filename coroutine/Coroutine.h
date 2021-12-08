@@ -1,7 +1,7 @@
 #ifndef BERT_COROUTINE_H
 #define BERT_COROUTINE_H
 
-// Only linux
+// Only linux 额协程
 
 #include <ucontext.h>
 

@@ -18,13 +18,13 @@ void ThreadFuncV() {
 }
 
 int main(int ac, char* av[]) {
-    std::cout << "main id " << std::this_thread::get_id() << std::endl;
-    auto& app = Application::Instance();
-    auto& loop = *app.BaseLoop();
+    std::cout << "main id " << std::this_thread::get_id() << std::endl; // 当前线程的id
+    auto& app = Application::Instance();    // 返回一个single instance
+    auto& loop = *app.BaseLoop();   // app.BaseLoop()返回地址, 取完地址loop是对象的引用
 
-    ananas::ThreadPool tpool;
+    ananas::ThreadPool tpool;   // 线程池对象
 
-    Future<int> ft(tpool.Execute(ThreadFunc<int>));
+    Future<int> ft(tpool.Execute(ThreadFunc<int>)); // 线程池执行ThreadFunc<int>, Future可以让主线程有能力获得线程池的执行结果
 
     ft.Then(&loop, [](int v) {
         std::cout << "1.Then got int value " << v

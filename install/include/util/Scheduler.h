@@ -1,8 +1,6 @@
 #ifndef BERT_SCHEDULER_H
 #define BERT_SCHEDULER_H
 
-#include <chrono>
-#include <functional>
 namespace ananas {
 
 class Scheduler {
@@ -32,7 +30,7 @@ public:
     virtual void Schedule(std::function<void()> f) = 0;
 };
 
-} // namespace ananas
+} // end namespace ananas
 
 #endif
 

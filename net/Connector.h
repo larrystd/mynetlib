@@ -16,6 +16,7 @@ enum class ConnectState {
     failed,
 };
 
+// client 连接
 class Connector : public Channel {
 public:
     explicit
@@ -56,8 +57,8 @@ private:
     NewTcpConnCallback newConnCallback_;
 };
 
-} // end namespace internal
-} // end namespace ananas
+} // namespace internal
+} // namespace ananas
 
 #endif
 

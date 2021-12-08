@@ -8,20 +8,20 @@
 namespace ananas {
 namespace internal {
 
-class Acceptor : public Channel {   // 继承自Channel的Acceptor, 是Channel对象
+class Acceptor : public Channel {   // 继承自Channel的Acceptor, Acceptor本身也是Channel对象
 public:
-    explicit
-    Acceptor(EventLoop* loop);
+    explicit Acceptor(EventLoop* loop);
     ~Acceptor();
 
-    Acceptor(const Acceptor& ) = delete;
+    Acceptor(const Acceptor& ) = delete;    // 不可拷贝或赋值
     void operator= (const Acceptor& ) = delete;
 
-    void SetNewConnCallback(NewTcpConnCallback cb);
-    bool Bind(const SocketAddr& addr);
+    void SetNewConnCallback(NewTcpConnCallback cb); // 设置连接回调函数
+    bool Bind(const SocketAddr& addr);  // 绑定地址addr
 
-    int Identifier() const override;
-    bool HandleReadEvent() override;
+    int Identifier() const override;    // 返回acceptor建立的sockfd
+
+    bool HandleReadEvent() override;    // 可读, 可写, 错误处理回调函数
     bool HandleWriteEvent() override;
     void HandleErrorEvent() override;
 
@@ -30,18 +30,18 @@ private:
 
     SocketAddr peer_;
     int localSock_;
-    uint16_t localPort_;
+    uint16_t localPort_;    // 本地端口
 
     EventLoop* const loop_; // which loop belong to
 
     //register msg callback and on connect callback for conn
-    NewTcpConnCallback newConnCallback_;
+    NewTcpConnCallback newConnCallback_;    // 连接回调函数
 
     static const int kListenQueue;
 };
 
-} // end namespace internal
-} // end namespace ananas
+} // namespace internal
+} // namespace ananas
 
 #endif
 

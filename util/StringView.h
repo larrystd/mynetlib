@@ -56,22 +56,22 @@ private:
     size_t len_;
 };
 
-bool operator==(const StringView& a, const StringView& b);
+bool operator==(const StringView& a, const StringView& b);  // 重载operator比较操作符
 bool operator!=(const StringView& a, const StringView& b);
 bool operator<(const StringView& a, const StringView& b);
 bool operator>(const StringView& a, const StringView& b);
 bool operator<=(const StringView& a, const StringView& b);
 bool operator>=(const StringView& a, const StringView& b);
 
-inline std::ostream& operator<< (std::ostream& os, const StringView& sv) {
+inline std::ostream& operator<< (std::ostream& os, const StringView& sv) {  // 重载operator<< 以能被ostream输出
     return os << sv.Data();
 }
 
-} // end namespace ananas
+} // namespace ananas
 
 namespace std {
 template<>
-struct hash<ananas::StringView> {
+struct hash<ananas::StringView> {   // StringView可以被hash(应该是方便unordered_map使用吧)
     typedef ananas::StringView argument_type;
     typedef std::size_t result_type;
     result_type operator()(const argument_type& sv) const noexcept {

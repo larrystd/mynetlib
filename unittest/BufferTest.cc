@@ -1,9 +1,15 @@
 
-#include "gtest/gtest.h"
-#include "util/Buffer.h"
-
+#include <gtest/gtest.h>
+#include <util/Buffer.h>
+using ::testing::EmptyTestEventListener;
+using ::testing::InitGoogleTest;
+using ::testing::Test;
+using ::testing::TestEventListeners;
+using ::testing::TestInfo;
+using ::testing::TestPartResult;
+using ::testing::UnitTest;
 using namespace ananas;
-
+// g++ -o BufferTest BufferTest.cc -I /home/larry/myproject/ananas/install/include -L /home/larry/myproject/ananas/install/lib -lananas_net -lananas_util -lgtest -lpthread
 
 TEST(buffer, push) {
     Buffer buf;
@@ -100,5 +106,19 @@ TEST(buffer, push_pop) {
 
     buf.Shrink();
     EXPECT_EQ(buf.Capacity(), 1);
+}
+
+
+int main(int argc, char **argv) {
+  InitGoogleTest(&argc, argv);
+
+  bool check_for_leaks = false;
+  if (argc > 1 && strcmp(argv[1], "--check_for_leaks") == 0 )
+    check_for_leaks = true;
+  else
+    printf("%s\n", "Run this program with --check_for_leaks to enable "
+           "custom leak checking in the tests.");
+
+  return RUN_ALL_TESTS();
 }
 

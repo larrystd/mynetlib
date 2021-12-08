@@ -26,8 +26,8 @@ void ThreadPool::_Start() {
   assert(workers_.empty());
 
   for (int i = 0; i < numThreads_; i++) {
-    std::thread t([this]() { this->_WorkerRoutine(); });
-    workers_.push_back(std::move(t));
+    std::thread t([this]() { this->_WorkerRoutine(); });    // 线程执行this->_WorkerRoutine()函数
+    workers_.push_back(std::move(t));   // 创建线程并将线程放入到workers_中
   }
 }
 
@@ -54,10 +54,11 @@ void ThreadPool::JoinAll() {
     }
 }
 
+// 子线程创建初始化执行的函数, 从task列表去除task来执行
 void ThreadPool::_WorkerRoutine() {
     while (true) {
         std::function<void ()> task;
-
+        // 取出task, 这是个阻塞队列
         {
             std::unique_lock<std::mutex> guard(mutex_);
 
@@ -89,5 +90,5 @@ size_t ThreadPool::Tasks() const {
   return tasks_.size();
 }
 
-} // end namespace ananas
+} // namespace ananas
 

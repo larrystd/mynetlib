@@ -10,7 +10,7 @@ class Connection;
 class DatagramSocket;
 class EventLoop;
 
-using NewTcpConnCallback = std::function<void (Connection* )>;
+using NewTcpConnCallback = std::function<void (Connection* )>;  // Tcp连接回调函数
 using TcpConnFailCallback = std::function<void (EventLoop*, const SocketAddr& peer)>;
 using TcpMessageCallback = std::function<size_t (Connection*, const char* data, size_t len)>;   // 信息回调
 using TcpWriteCompleteCallback = std::function<void (Connection* )>;

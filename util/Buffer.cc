@@ -17,7 +17,6 @@ inline static std::size_t RoundUp2Power(std::size_t size) {
     return roundUp;
 }
 
-
 const std::size_t Buffer::kMaxBufferSize = std::numeric_limits<std::size_t>::max() / 2;
 const std::size_t Buffer::kHighWaterMark = 1 * 1024;
 const std::size_t Buffer::kDefaultSize = 256;

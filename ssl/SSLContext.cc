@@ -229,7 +229,7 @@ bool OpenSSLContext::DoHandleShake() {
             c->ActiveClose();
             return false;
         } else {
-            ssl_->state = SSL_ST_ACCEPT;
+            //ssl_->state = SSL_ST_ACCEPT;
             INF(internal::g_debug) << "server SSL_ST_ACCEPT and state:" << SSL_state_string_long(ssl_);
         }
     }

@@ -64,8 +64,7 @@ bool EventLoop::Listen(const char* ip,
     return Listen(addr, std::move(newConnCallback));
 }
 
-// eventloop的监听, 先创建一个Acceptor, 配置回调函数和bind
-// 事实上再acceptor对象中创建sockfd, 绑定地址并监听
+// eventloop的监听, 先创建一个Acceptor, 配置回调函数和Bind, Bind这里包括bind和listen
 bool EventLoop::Listen(const SocketAddr& listenAddr,
                        NewTcpConnCallback newConnCallback) {
     using internal::Acceptor;
@@ -80,8 +79,8 @@ bool EventLoop::Listen(const SocketAddr& listenAddr,
 
 bool EventLoop::ListenUDP(const SocketAddr& listenAddr,
                           UDPMessageCallback mcb,
-                          UDPCreateCallback ccb) {
-    auto s = std::make_shared<DatagramSocket>(this);
+                          UDPCreateCallback ccb) {  // UDP设置回调函数, bin
+    auto s = std::make_shared<DatagramSocket>(this);    
     s->SetMessageCallback(mcb);
     s->SetCreateCallback(ccb);
     if (!s->Bind(&listenAddr))
@@ -118,9 +117,9 @@ bool EventLoop::Connect(const char* ip,
                         DurationMs timeout,
                         EventLoop* dstLoop) {
     SocketAddr addr;
-    addr.Init(ip, hostPort);
+    addr.Init(ip, hostPort);    // 用ip, hostPort构造addr
 
-    return Connect(addr, nccb, cfcb, timeout, dstLoop);
+    return Connect(addr, nccb, cfcb, timeout, dstLoop); // 发起连接addr地址
 }
 
 
@@ -148,7 +147,7 @@ std::atomic<int> EventLoop::s_evId {0};
 
 rlim_t EventLoop::s_maxOpenFdPlus1 = ananas::GetMaxOpenFd();
 
-bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {  // 注册一个events和Channel
+bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {  // 注册一个events，Channel到poll
     if (events == 0)
         return false;
 
@@ -177,13 +176,13 @@ bool EventLoop::Register(int events, std::shared_ptr<internal::Channel> src) {  
     src->SetUniqueId(s_id);
     ANANAS_INF << "Register " << s_id << " to me " << pthread_self();
 
-    if (poller_->Register(src->Identifier(), events, src.get()))    // 注册Channel到poller_中
-        return channelSet_.insert({src->GetUniqueId(), src}).second;
+    if (poller_->Register(src->Identifier(), events, src.get()))    // 注册Channel到poller_
+        return channelSet_.insert({src->GetUniqueId(), src}).second;    // 成功插入channelSet
 
     return false;
 }
 
-bool EventLoop::Modify(int events, std::shared_ptr<internal::Channel> src) {
+bool EventLoop::Modify(int events, std::shared_ptr<internal::Channel> src) {    // 修改poller的event和fd
     assert (channelSet_.count(src->GetUniqueId()));
     return poller_->Modify(src->Identifier(), events, src.get());
 }
@@ -204,7 +203,7 @@ bool EventLoop::Cancel(TimerId id) {
     return timers_.Cancel(id);
 }
 
-void EventLoop::Run() {
+void EventLoop::Run() { // 主循环
     assert (this->InThisLoop());
 
     const DurationMs kDefaultPollTime(10);
@@ -212,7 +211,7 @@ void EventLoop::Run() {
 
     Register(internal::eET_Read, notifier_);   // notifier channel注册可读到poller中, 这个用来唤醒epoll_wait 
 
-    // 一个loop循环
+    // 主循环,执行_Loop
     while (!Application::Instance().IsExit()) {
         auto timeout = std::min(kDefaultPollTime, timers_.NearestTimer());
         timeout = std::max(kMinPollTime, timeout);
@@ -220,7 +219,7 @@ void EventLoop::Run() {
         _Loop(timeout);// 这个思想和redis类似, 在timeout时间下执行loop循环, 等超时了执行定时器
     }
 
-    for (auto& kv : channelSet_) {
+    for (auto& kv : channelSet_) {  // 取消所有channelSet 
         poller_->Unregister(internal::eET_Read | internal::eET_Write,
                             kv.second->Identifier());
     }
@@ -229,7 +228,7 @@ void EventLoop::Run() {
     poller_.reset();
 }
 
-bool EventLoop::_Loop(DurationMs timeout) {
+bool EventLoop::_Loop(DurationMs timeout) { // 一个loop循环
     ANANAS_DEFER {
         timers_.Update();   // 优先处理定时器, 保证不超时
 
@@ -240,7 +239,7 @@ bool EventLoop::_Loop(DurationMs timeout) {
             funcs.swap(functors_);
             fctrMutex_.unlock();
 
-            for (const auto& f : funcs)
+            for (const auto& f : funcs) // 执行
                 f();
         }
     };
@@ -257,7 +256,7 @@ bool EventLoop::_Loop(DurationMs timeout) {
         return false;
 
     
-    const auto& fired = poller_->GetFiredEvents();
+    const auto& fired = poller_->GetFiredEvents();  // 得到活跃的事件
 
     // Consider stale event, DO NOT unregister another socket in event handler!
 
@@ -307,5 +306,5 @@ void EventLoop::Schedule(std::function<void()> f) {
     Execute(std::move(f));
 }
 
-} // end namespace ananas
+} // namespace ananas
 

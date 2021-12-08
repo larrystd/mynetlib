@@ -33,7 +33,7 @@ void TimerManager::Update() {
         if (timer.count_ != 0) {
             // need reschedule
             const auto tp = timer.id_->first;
-            auto itNew = timers_.insert(std::make_pair(tp, std::move(timer)));
+            auto itNew = timers_.insert(std::make_pair(tp, std::move(timer)));  // 插入到定时器
             if (it == timers_.end() || itNew->first < it->first)
                 it = itNew;
         }

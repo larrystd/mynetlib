@@ -108,7 +108,7 @@ bool Connector::HandleReadEvent() {
     return false;
 }
 
-bool Connector::HandleWriteEvent() {
+bool Connector::HandleWriteEvent() {    // 可写回调
     int error = 0;
     socklen_t len = sizeof(error);
 
@@ -201,6 +201,6 @@ void Connector::_OnFailed() {
     });
 }
 
-} // end namespace internal
-} // end namespace ananas
+} // namespace internal
+} // namespace ananas
 

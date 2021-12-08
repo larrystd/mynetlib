@@ -13,7 +13,6 @@
 #include "ananas/util/Scheduler.h"
 #include "ananas/future/Future.h"
 
-///@file EventLoop.h
 namespace ananas {
 
 struct SocketAddr;
@@ -31,13 +30,13 @@ public:
     EventLoop();
     ~EventLoop();
 
-    EventLoop(const EventLoop& ) = delete;
+    EventLoop(const EventLoop& ) = delete;  // 不可拷贝和移动
     void operator= (const EventLoop& ) = delete;
     EventLoop(EventLoop&& ) = delete;
     void operator= (EventLoop&& ) = delete;
 
     // listener
-    bool Listen(const SocketAddr& addr, NewTcpConnCallback cb);
+    bool Listen(const SocketAddr& addr, NewTcpConnCallback cb); 
     bool Listen(const char* ip, uint16_t hostPort, NewTcpConnCallback cb);
     bool ListenUDP(const SocketAddr& listenAddr,
                    UDPMessageCallback mcb,
@@ -102,10 +101,10 @@ public:
     ///@endcode
     ///my_work_func will be executed ASAP, but you SHOULD assure that
     ///it will NOT block, otherwise EventLoop will be hang!
+    // 执行函数, 返回值是Future
     template <typename F, typename... Args,
-              typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type,
-              typename Dummy = void>
-    auto Execute(F&& , Args&&...) -> Future<typename std::result_of<F (Args...)>::type>;
+        typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type, typename Dummy = void>
+    auto Execute(F&&, Args&&...) -> Future<typename std::result_of<F (Args...)>::type>; // std::result_of用来推导类型
 
     ///@brief Execute work in this loop
     /// thread-safe, and F return void
@@ -118,7 +117,7 @@ public:
     /// It's a infinite loop, until Application stopped
     void Run();
 
-    bool Register(int events, std::shared_ptr<internal::Channel> src);
+    bool Register(int events, std::shared_ptr<internal::Channel> src);  // 注册channel到poller
     bool Modify(int events, std::shared_ptr<internal::Channel> src);
     void Unregister(int events, std::shared_ptr<internal::Channel> src);
 
@@ -152,19 +151,17 @@ public:
 private:
     bool _Loop(DurationMs timeout);
 
-    std::unique_ptr<internal::Poller> poller_;
+    std::unique_ptr<internal::Poller> poller_;  // eventloop与之对应的poller_
 
-    std::shared_ptr<internal::PipeChannel> notifier_;   // 明显这个是eventfd,能触发的
+    std::shared_ptr<internal::PipeChannel> notifier_;   // 这个是eventfd,用来唤醒reactor阻塞的epoll_wait
 
     internal::TimerManager timers_;
 
     // channelSet_ must be destructed before timers_
-    std::map<unsigned int, std::shared_ptr<internal::Channel> > channelSet_;
+    std::map<unsigned int, std::shared_ptr<internal::Channel> > channelSet_;    // channel集合, map fd->channel
 
-    std::mutex fctrMutex_;
-
-    // 要处理的函数任务
-    std::vector<std::function<void ()> > functors_;
+    std::mutex fctrMutex_;  // 互斥器
+    std::vector<std::function<void ()> > functors_;     // 要处理的函数任务
 
     int id_;
     static std::atomic<int> s_evId;
@@ -175,7 +172,6 @@ private:
     static rlim_t s_maxOpenFdPlus1;
 };
 
-// 处理定时器
 template <int RepeatCount, typename Duration, typename F, typename... Args>
 TimerId EventLoop::ScheduleAtWithRepeat(const TimePoint& triggerTime,
                                         const Duration& period,
@@ -184,7 +180,7 @@ TimerId EventLoop::ScheduleAtWithRepeat(const TimePoint& triggerTime,
     return timers_.ScheduleAtWithRepeat<RepeatCount>(triggerTime,
                                                      period,
                                                      std::forward<F>(f),
-                                                     std::forward<Args>(args)...);
+                                                     std::forward<Args>(args)...);  // 定时器处理函数
 }
 
 template <int RepeatCount, typename Duration, typename F, typename... Args>
@@ -202,7 +198,7 @@ TimerId EventLoop::ScheduleAt(const TimePoint& triggerTime,
     assert (InThisLoop());
     return timers_.ScheduleAt(triggerTime,
                               std::forward<F>(f),
-                              std::forward<Args>(args)...);
+                              std::forward<Args>(args)...); // 某个时刻执行F, 调用timers_
 }
 
 template <typename Duration, typename F, typename... Args>
@@ -226,9 +222,9 @@ EventLoop::Execute(F&& f, Args&&... args) {
     auto future = promise.GetFuture();
 
     if (InThisLoop()) {
-        promise.SetValue(std::forward<F>(f)(std::forward<Args>(args)...));
+        promise.SetValue(std::forward<F>(f)(std::forward<Args>(args)...));  // promise.SetValue
     } else {
-        auto task = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+        auto task = std::bind(std::forward<F>(f), std::forward<Args>(args)...); // 任务
         auto func = [t = std::move(task), pm = std::move(promise)]() mutable {
             try {
                 pm.SetValue(Try<resultType>(t()));
@@ -239,10 +235,10 @@ EventLoop::Execute(F&& f, Args&&... args) {
 
         {
             std::unique_lock<std::mutex> guard(fctrMutex_);
-            functors_.emplace_back(std::move(func));    // func暂且加入functors_
+            functors_.emplace_back(std::move(func));    // func加入要执行线程functors_列表
         }
 
-        notifier_->Notify();    // 写一些东西使fd可读
+        notifier_->Notify();    // 写一些东西使fd可读, 唤醒epoll_wait
     }
 
     return future;
@@ -256,13 +252,13 @@ Future<void> EventLoop::Execute(F&& f, Args&&... args) {
     static_assert(std::is_void<resultType>::value, "must be void");
 
     Promise<void> promise;
-    auto future = promise.GetFuture();  // 使用异步调用函数F
+    auto future = promise.GetFuture();  // 从promise获得future对象
 
     if (InThisLoop()) {
         std::forward<F>(f)(std::forward<Args>(args)...);
         promise.SetValue();
     } else {
-        auto task = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
+        auto task = std::bind(std::forward<F>(f), std::forward<Args>(args)...); // 要执行的任务
         auto func = [t = std::move(task), pm = std::move(promise)]() mutable {
             try {
                 t();
@@ -284,7 +280,7 @@ Future<void> EventLoop::Execute(F&& f, Args&&... args) {
 }
 
 
-} // end namespace ananas
+} // namespace ananas
 
 #endif
 

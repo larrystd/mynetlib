@@ -10,7 +10,7 @@
 namespace ananas {
 
 ///@brief A simple buffer with memory management like STL's vector<char>
-class Buffer {
+class Buffer {  // 缓冲
 public:
     Buffer() :
         readPos_(0),
@@ -116,7 +116,7 @@ struct BufferVector {
         totalBytes += buf.ReadableSize();
         if (_ShouldMerge()) {
             auto& last = buffers.back();
-            last.PushData(buf.ReadAddr(), buf.ReadableSize());
+            last.PushData(buf.ReadAddr(), buf.ReadableSize());  // push到buffer中
         } else {
             buffers.push_back(std::move(buf));
         }
@@ -126,8 +126,8 @@ struct BufferVector {
         totalBytes += size;
         if (_ShouldMerge()) {
             auto& last = buffers.back();
-            last.PushData(data, size);
-        } else {
+            last.PushData(data, size);  // 在buffer后面push数据
+        } else{
             buffers.push_back(Buffer(data, size));
         }
     }
@@ -228,7 +228,7 @@ private:
     Slices slices;
 };
 
-} // end namespace ananas
+} // namespace ananas
 
 #endif
 

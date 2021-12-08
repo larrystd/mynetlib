@@ -1,4 +1,3 @@
-
 #ifndef BERT_CONNECTION_H
 #define BERT_CONNECTION_H
 
@@ -10,83 +9,53 @@
 #include "Typedefs.h"
 #include "ananas/util/Buffer.h"
 
-///@file Connection.h
 namespace ananas {
 
-namespace internal {
+namespace internal {    // 前向声明两个类
 class Acceptor;
 class Connector;
 }
 
-enum class ShutdownMode {
+enum class ShutdownMode {   // 枚举类
     eSM_Both,
     eSM_Read,
     eSM_Write,
 };
 
-///@brief Abstract for stream socket
-class Connection : public internal::Channel {
-public:
-    explicit
-    Connection(EventLoop* loop);
+class Connection : public internal::Channel { // 连接对象, 继承自Channel。这里继承的类是前向声明的
+ public:
+    explicit Connection(EventLoop* loop);
     ~Connection();
 
-    Connection(const Connection& ) = delete;
+    Connection(const Connection& ) = delete;    // 不可拷贝和赋值
     void operator= (const Connection& ) = delete;
 
-    ///@brief Init, called by library internal
-    bool Init(int sock, const SocketAddr& peer);
-
-    ///@brief Got peer address
-    ///@return Peer address, you can print it with ToString() method.
+    bool Init(int sock, const SocketAddr& peer);    // 用sockfd和peer addr初始化Connection
     const SocketAddr& Peer() const {
         return peer_;
     }
 
-    ///@brief Active close this connection, will be scheduled later in eventloop.
-    void ActiveClose();
+    void ActiveClose(); // 关闭Connection
 
-    ///@brief Return pointer to EventLoop which this connection in.
     EventLoop* GetLoop() const {
-        return loop_;
+        return loop_;   // 处理Connection的loop*
     }
-
-    ///@brief Call ::shutdown at once
     void Shutdown(ShutdownMode mode);
-
-    ///@brief About the NAGLE option
     void SetNodelay(bool enable);
 
-    ///@brief Return socket fd
-    int Identifier() const override;
-    bool HandleReadEvent() override;
+    int Identifier() const override;    // Connection 维护的fd
+    bool HandleReadEvent() override;    // Connection 可读, 可写, 错误事件回调函数
     bool HandleWriteEvent() override;
     void HandleErrorEvent() override;
 
-    ///@brief Send bytes to network
-    ///
-    /// NOT thread-safe
-    bool SendPacket(const void* data, std::size_t len);
-    ///@brief Send bytes to network
-    ///
-    /// NOT thread-safe
+    bool SendPacket(const void* data, std::size_t len); // 发送数据, 可以是void*, string对象, Buffer对象
     bool SendPacket(const std::string& data);
-    ///@brief Send bytes to network
-    ///
-    /// NOT thread-safe
     bool SendPacket(const Buffer& buf);
-    ///@brief Send vector bytes to network
-    ///
-    /// NOT thread-safe
+
     bool SendPacket(const BufferVector& datum);
-    ///@brief Send vector bytes to network
-    ///
-    /// NOT thread-safe
     bool SendPacket(const SliceVector& slice);
 
-    ///@brief Send bytes to network
-    ///
-    /// Thread-safe
+    // 线程安全的发送数据
     bool SafeSend(const void* data, std::size_t len);
     bool SafeSend(const std::string& data);
 
@@ -101,14 +70,11 @@ public:
     ///    one time, you should call SetBatchSend(false)
     void SetBatchSend(bool batch);
 
-    ///@brief Callback when connection established.
-    void SetOnConnect(std::function<void (Connection* )> cb);
-    ///@brief Callback when connection disconnected, usually for recycle resourse
-    void SetOnDisconnect(std::function<void (Connection* )> cb);
-    ///@brief Callback when recv data stream.
-    void SetOnMessage(TcpMessageCallback cb);
-    ///@brief Callback when send data without EAGAIN, kernel sendbuffer is enough
-    void SetOnWriteComplete(TcpWriteCompleteCallback wccb);
+    void SetOnConnect(std::function<void (Connection* )> cb);   // 连接建立回调
+    void SetOnDisconnect(std::function<void (Connection* )> cb);    // 连接断回调
+    
+    void SetOnMessage(TcpMessageCallback cb);   // 接受到数据流的回调
+    void SetOnWriteComplete(TcpWriteCompleteCallback wccb); // 发送完数据流的回调
 
     ///@brief Set user's context pointer
     void SetUserData(std::shared_ptr<void> user);
@@ -117,16 +83,12 @@ public:
     template <typename T>
     std::shared_ptr<T> GetUserData() const;
 
-    ///@brief Set the min size of your business packet
-    ///
-    /// If recv data less than this, never try onMessage_ callback.
-    void SetMinPacketSize(size_t s);
-    ///@brief Get the min size of your business packet
+    void SetMinPacketSize(size_t s);    // 包的最小大小, 小于这个等于没收到
     size_t GetMinPacketSize() const;
 
 private:
-    enum State {
-        eS_None,
+    enum State {    // Connection状态State枚举
+        eS_None,    // 空状态
         eS_Connected,
         eS_CloseWaitWrite,  // passive or active close, but I still have data to send
         eS_PassiveClose,    // should close
@@ -137,8 +99,9 @@ private:
 
     friend class internal::Acceptor;
     friend class internal::Connector;
+
     void _OnConnect();
-    int _Send(const void* data, size_t len);
+    int _Send(const void* data, size_t len);    // 发送数据
 
     EventLoop* const loop_;
     State state_ = State::eS_None;
@@ -154,22 +117,21 @@ private:
 
     SocketAddr peer_;
 
-    std::function<void (Connection* )> onConnect_;
+    std::function<void (Connection* )> onConnect_;  // 连接回调函数
     std::function<void (Connection* )> onDisconnect_;
 
-    TcpMessageCallback onMessage_;
+    TcpMessageCallback onMessage_;  // function<size_t (Connection*, const char* data, size_t len)>
     TcpWriteCompleteCallback onWriteComplete_;
 
     std::shared_ptr<void> userData_;
 };
-
 
 template <typename T>
 inline std::shared_ptr<T> Connection::GetUserData() const {
     return std::static_pointer_cast<T>(userData_);
 }
 
-} // end namespace ananas
+} // namespace ananas
 
 #endif
 
