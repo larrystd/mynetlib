@@ -100,7 +100,7 @@ EventLoop* Application::BaseLoop() {
 }
 
 void Application::SetOnInit(std::function<bool (int, char*[])> init) {
-    onInit_ = std::move(init);
+    onInit_ = std::move(init);  // init是一个函数
 }
 
 void Application::SetOnExit(std::function<void ()> onexit) {

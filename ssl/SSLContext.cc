@@ -337,7 +337,7 @@ void OnNewSSLConnection(const std::string& ctxName, int verifyMode, bool incomin
 #endif
 }
 
-} // end namespace ssl
+} // namespace ssl
 
-} // end namespace ananas
+} // namespace ananas
 

@@ -9,7 +9,7 @@
 #include "net/Connection.h"
 #include "Protocol.h"
 
-using DB = std::unordered_map<std::string, std::string>;
+using DB = std::unordered_map<std::string, std::string>;    // 作为key-value数据库
 
 class RedisContext {
 public:

@@ -4,7 +4,7 @@ package ananas.rpc.test;
 
 option cc_generic_services = true;
 
-// sample
+// sample 消息
 message EchoRequest {
     string text = 1;
 }

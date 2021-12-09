@@ -3,7 +3,7 @@
 
 #include <string>
 #include "ananas/net/Socket.h"
-#include "protobuf_rpc/ananas_rpc.pb.h"
+#include "ananas/protobuf_rpc/ananas_rpc.pb.h"
 
 ///@file RpcEndpoint.h
 namespace ananas {

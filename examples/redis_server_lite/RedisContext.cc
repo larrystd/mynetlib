@@ -51,7 +51,7 @@ size_t RedisContext::OnRecv(ananas::Connection* conn, const char* data, size_t l
     const char* const end = data + len;
     const char* ptr = data;
 
-    auto parseRet = proto_.ParseRequest(ptr, end);
+    auto parseRet = proto_.ParseRequest(ptr, end);  // 解析请求
     if (parseRet == ParseResult::error) {
         if (!proto_.IsInitialState()) {
             ERR(logger) << "ParseError for " << data;

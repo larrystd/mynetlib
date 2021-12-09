@@ -81,6 +81,10 @@
         "bit": "cpp",
         "variant": "cpp",
         "*.ipp": "cpp",
-        "*.impl": "cpp"
+        "*.impl": "cpp",
+        "csignal": "cpp",
+        "__errc": "cpp",
+        "__node_handle": "cpp",
+        "*.inc": "cpp"
     }
 }
