@@ -23,7 +23,7 @@
 namespace ananas {
 
 ///@brief A powerful ThreadPool implementation with Future interface.
-class ThreadPool final {
+class ThreadPool final {    // 线程池
 public:
     ThreadPool();
     ~ThreadPool();
@@ -41,12 +41,13 @@ public:
     /// limit, f will be queueing, will be executed later.
     ///
     /// F returns non-void
+    // std::result_of Deduces the return type of an INVOKE expression at compile time. 
+    // std::enable_if要求第一个模板参数必须为true, 从而起到筛选的作用。这里控制F invoke 函数执行的返回值不能为void, 否则编译错误
+    // 同时下面还有一个定义返回值为void的函数, 从而让调用者选择合理的函数返回值匹配, 很强大(直接返回值而不是输出参数)
     template <typename F, typename... Args,
-              typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type,
-              typename Dummy = void>
-    auto Execute(F&& f, Args&&... args) -> Future<typename std::result_of<F (Args...)>::type>;
-
-    ///@brief Execute work in this pool
+            typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type,
+            typename Dummy = void>
+    auto Execute(F&& f, Args&&... args) -> Future<typename std::result_of<F (Args... )>::type>;    // 返回值为Future<返回值类型>
     ///@return A future, you can register callback on it
     ///when f is done or timeout.
     ///
@@ -55,7 +56,7 @@ public:
     /// But if all threads are busy and threads size reach
     /// limit, f will be queueing, will be executed later.
     ///
-    /// F returns void
+    /// F returns void F 返回值为void匹配这个函数
     template <typename F, typename... Args,
               typename = typename std::enable_if<std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type>
     auto Execute(F&& f, Args&&... args) -> Future<void>;
@@ -71,21 +72,21 @@ public:
 
     // ---- below are for unittest ----
     // num of workers
-    size_t WorkerThreads() const;
+    size_t WorkerThreads() const;   // 工作线程
     // num of waiting tasks
-    size_t Tasks() const;
+    size_t Tasks() const;   // 任务数量
 
 private:
     void _WorkerRoutine();
     void _Start();
 
     int numThreads_ {1};
-    std::deque<std::thread> workers_;
+    std::deque<std::thread> workers_;   // 线程队列, 充当消费者
 
     mutable std::mutex mutex_;
     std::condition_variable cond_;
     bool shutdown_ {false};
-    std::deque<std::function<void ()> > tasks_;
+    std::deque<std::function<void ()> > tasks_; // 任务队列, 充当生产者
 
     static const int kMaxThreads = 512;
     static std::thread::id s_mainThread;
@@ -140,22 +141,23 @@ auto ThreadPool::Execute(F&& f, Args&&... args) -> Future<void> {
     }
 
     Promise<resultType> promise;
-    auto future = promise.GetFuture();
+    auto future = promise.GetFuture();  // future可以用来获取异步信息
 
     auto func = std::bind(std::forward<F>(f), std::forward<Args>(args)...); // 要执行的任务
+    // task会放入task_任务队列由子线程执行, 并给pm赋值, 子线程pm赋值主线程从future获取
     auto task = [t = std::move(func), pm = std::move(promise)]() mutable {
         try {
             t();
-            pm.SetValue();  // 运行完结果
-        } catch(...) {
+            pm.SetValue();  // 子线程设置值
+        } catch(...) {  // matches exceptions of any type.
             pm.SetException(std::current_exception());
         }
     };
 
-    tasks_.emplace_back(std::move(task));   // 任务加入任务列表
-    cond_.notify_one(); // 唤醒一个线程(很明显是子线程唤醒主线程)
+    tasks_.emplace_back(std::move(task));   // 任务加入任务列表(让子线程自动执行)
+    cond_.notify_one(); // 唤醒一个子线程执行，因为任务列表有任务了, 唤醒一个就行
 
-    return future;  // future是子线程运行完的生成对象
+    return future;  // future是子线程运行完的生成对象, 包含子线程的setvalue
 }
 
 } // namespace ananas

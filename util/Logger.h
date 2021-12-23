@@ -17,7 +17,7 @@
 #include "Buffer.h"
 #include "MmapFile.h"
 
-enum LogLevel {
+enum LogLevel { // 用位运算表示日志各个等级
     logINFO     = 0x01 << 0,
     logDEBUG    = 0x01 << 1,
     logWARN     = 0x01 << 2,
@@ -26,7 +26,7 @@ enum LogLevel {
     logALL      = 0xFFFFFFFF,
 };
 
-enum LogDest {
+enum LogDest {  // 日志的输出位置
     logConsole  = 0x01 << 0,
     logFile     = 0x01 << 1,
     logSocket   = 0x01 << 2,
@@ -35,27 +35,27 @@ enum LogDest {
 namespace ananas {
 
 class Logger {
-public:
+ public:
     friend class LogManager;
 
     Logger();
     ~Logger();
 
     Logger(const Logger& ) = delete;
-    void operator= (const Logger& ) = delete;
-    Logger(Logger&& ) = delete;
+    void operator= (const Logger&) = delete;
+    Logger(Logger&& ) = delete; // 移动函数不用const
     void operator= (Logger&& ) = delete;
 
     bool Init(unsigned int level = logDEBUG,
-              unsigned int dest = logConsole,
-              const char* pDir  = 0);
-
-    void Flush(LogLevel  level);
+            unsigned int dest = logConsole,
+            const char* pDir = 0);  // 初始化, 声明时使用了缺省函数
+    void Flush(LogLevel level);
     bool IsLevelForbid(unsigned int level) const {
-        return  !(level & level_);
-    };
+        return !(level & level_);   // 可以多个level混合
+    }
 
-    Logger&  operator<<(const char* msg);
+
+    Logger& operator<< (const char* msg);   // 重载operator, 将字符串写入到Logger对象
     Logger&  operator<<(const unsigned char* msg);
     Logger&  operator<<(const std::string& msg);
     Logger&  operator<<(void* );
@@ -72,16 +72,12 @@ public:
     Logger&  operator<<(double a);
 
     Logger& SetCurLevel(unsigned int level);
-
     void Shutdown();
-
     bool Update();
 
-private:
-
+ private:
     static const size_t kMaxCharPerLog = 2048;
-    // parallel format log string thread_local 线程内部变量
-    static thread_local char tmpBuffer_[kMaxCharPerLog];
+    static thread_local char tmpBuffer_[kMaxCharPerLog];    // thread_local 线程内部变量, 或者说表示线程状态的日志
     static thread_local std::size_t pos_;
     static thread_local int64_t lastLogSecond_;
     static thread_local int64_t lastLogMSecond_;
@@ -98,7 +94,6 @@ private:
     std::map<std::thread::id, std::unique_ptr<BufferInfo> > buffers_;
     bool shutdown_;
 
-    // const vars from init()
     unsigned int level_;
     std::string directory_;
     unsigned int dest_;
@@ -119,39 +114,34 @@ private:
     static unsigned int seq_;
 };
 
-
-class LogManager {
-public:
-    static LogManager& Instance();
+class LogManager {  // 日志管理对象
+ public:
+    static LogManager& Instance();  // 单例对象
 
     void Start();
     void Stop();
 
     std::shared_ptr<Logger> CreateLog(unsigned int level,
-                                      unsigned int dest,
-                                      const char* dir = nullptr);
-
+                                        unsigned int dest,
+                                        const char* dir = nullptr);
+    
     void AddBusyLog(Logger* );
-    Logger* NullLog()  {
-        return  &nullLog_;
+    Logger* NullLog() {
+        return &nullLog_;
     }
 
 private:
     LogManager();
 
     void Run();
-
     std::mutex logsMutex_;
-    std::vector<std::shared_ptr<Logger>> logs_;
-
+    std::vector<std::shared_ptr<Logger>> logs_;   // 管理的日志对象列表
     std::mutex mutex_;
     std::condition_variable cond_;
     bool shutdown_;
     std::set<Logger* > busyLogs_;
 
-    // null object
     Logger nullLog_;
-
     std::thread iothread_;
 };
 
@@ -172,6 +162,7 @@ private:
 #undef ERR
 #undef USR
 
+// 用宏定义声明, 外界可以直接使用
 #define LOG_DBG(x) (!(x) || (x)->IsLevelForbid(logDEBUG)) ? *ananas::LogManager::Instance().NullLog() : (ananas::LogHelper(logDEBUG)) = x->SetCurLevel(logDEBUG)
 
 #define LOG_INF(x) (!(x) || (x)->IsLevelForbid(logINFO)) ? *ananas::LogManager::Instance().NullLog() : (ananas::LogHelper(logINFO)) = x->SetCurLevel(logINFO)

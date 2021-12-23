@@ -45,7 +45,7 @@ bool OMmapFile::Open(const std::string& file, bool bAppend) {
 bool OMmapFile::Open(const char* file, bool bAppend) {
     Close();
 
-    file_ = ::open(file, O_RDWR | O_CREAT | (bAppend ? O_APPEND : 0), 0644);
+    file_ = ::open(file, O_RDWR | O_CREAT | (bAppend ? O_APPEND : 0), 0644);    // 使用
 
     if (file_ == kInvalidFile) {
         char err[128];
@@ -104,7 +104,7 @@ bool OMmapFile::_MapWriteOnly() {
         return false;
     }
 
-    memory_ = (char*)::mmap(0, size_, PROT_WRITE, MAP_SHARED, file_, 0);
+    memory_ = (char*)::mmap(0, size_, PROT_WRITE, MAP_SHARED, file_, 0);    // mmap文件
     return (memory_ != kInvalidAddr);
 }
 
@@ -127,7 +127,7 @@ bool OMmapFile::IsOpen() const {
 }
 
 // consumer
-void OMmapFile::Write(const void* data, size_t len) {
+void OMmapFile::Write(const void* data, size_t len) {   // 只是写到缓冲区
     _AssureSpace(len);
 
     assert (offset_ + len <= size_);

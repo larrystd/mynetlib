@@ -24,7 +24,7 @@ inline std::ostream& operator<< (std::ostream& os, const TimerId& d) {
 
 namespace internal {
 
-///@brief TimerManager class
+///@brief TimerManager class 定时器
 ///
 /// You should not used it directly, but via Eventloop
 class TimerManager final {

@@ -10,7 +10,7 @@
 ///@file TimeUtil.h
 namespace ananas {
 
-///@brief Simple encapsulation for time point
+///@brief Simple encapsulation for time point 时间戳
 class Time {
 public:
     Time();

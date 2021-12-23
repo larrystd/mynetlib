@@ -6,7 +6,7 @@
 namespace ananas {
 namespace internal {
 
-class OMmapFile {
+class OMmapFile {   // 操作文件的函数
 public:
     OMmapFile();
     ~OMmapFile();

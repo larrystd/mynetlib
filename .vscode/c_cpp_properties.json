@@ -4,7 +4,8 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/home/larry/myproject"
+                "/home/larry/myproject",
+                "/home/larry/myproject/ananas/rpclib"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

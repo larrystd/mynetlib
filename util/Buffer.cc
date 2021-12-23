@@ -1,4 +1,3 @@
-
 #include "Buffer.h"
 #include <iostream>
 #include <limits>

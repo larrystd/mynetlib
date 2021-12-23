@@ -14,6 +14,7 @@ namespace ananas {
 // 毕竟string其实是动态数据, 因此要先将传入的string construct到内存中
 class StringView {
 public:
+    // 类型别名
     using value_type = char;
     using pointer = char*;
     using const_pointer = const char*;

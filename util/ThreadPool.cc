@@ -18,6 +18,7 @@ void ThreadPool::SetNumOfThreads(int n) {
     numThreads_ = n;
 }
 
+// 开启线程池, 即创建子线程让他们等待任务列表有任务
 void ThreadPool::_Start() {
   if (shutdown_) {
     return;
@@ -26,11 +27,12 @@ void ThreadPool::_Start() {
   assert(workers_.empty());
 
   for (int i = 0; i < numThreads_; i++) {
-    std::thread t([this]() { this->_WorkerRoutine(); });    // 线程执行this->_WorkerRoutine()函数
-    workers_.push_back(std::move(t));   // 创建线程并将线程放入到workers_中
+    std::thread t([this]() { this->_WorkerRoutine(); });    // 创建子线程执行this->_WorkerRoutine()函数
+    workers_.push_back(std::move(t));   // 将子线程放入到workers_中
   }
 }
 
+// 等待线程执行完毕
 void ThreadPool::JoinAll() {
     if (s_mainThread != std::this_thread::get_id())
         return;
@@ -43,7 +45,7 @@ void ThreadPool::JoinAll() {
             return;
 
         shutdown_ = true;
-        cond_.notify_all();
+        cond_.notify_all(); // 唤醒所有子线程, 并设置shutdown_ = true; 让它们退出
 
         tmp.swap(workers_);
     }
@@ -63,11 +65,11 @@ void ThreadPool::_WorkerRoutine() {
             std::unique_lock<std::mutex> guard(mutex_);
 
             cond_.wait(guard, [this]() {
-                return shutdown_ || !tasks_.empty();
+                return shutdown_ || !tasks_.empty();    // 任务列表为空, 子线程等待, 直到主线程将任务放入任务列表并唤醒子线程
             } );
 
             assert(shutdown_ || !tasks_.empty());
-            if (shutdown_ && tasks_.empty()) {
+            if (shutdown_ && tasks_.empty()) {  // 该退出了
                 return;
             }
 

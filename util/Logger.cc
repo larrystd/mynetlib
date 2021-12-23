@@ -29,7 +29,7 @@ enum LogColor {
 
 }
 
-// TODO config
+// 配置参数
 static const size_t kDefaultLogSize = 32 * 1024 * 1024;
 
 static const size_t kPrefixLevelLen = 6;
@@ -67,11 +67,11 @@ Logger::~Logger() {
 }
 
 bool Logger::Init(unsigned int level, unsigned int dest, const char* dir) {
-    level_      = level;
-    dest_       = dest;
-    directory_  = dir ? dir : ".";
+    level_ = level;
+    dest_ = dest;
+    directory_ = dir ? dir : ".";   // 在目录下创建日志
     if (directory_.back() == '/')
-        directory_.pop_back();
+    directory_.pop_back();
 
     if (0 == level_)
         return  true;
