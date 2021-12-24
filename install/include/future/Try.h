@@ -191,7 +191,7 @@ private:
     };
 };
 
-
+// 特化, Try<void>
 template <>
 class Try<void> {
     enum class State {
@@ -311,7 +311,7 @@ struct TryWrapper<Try<T>> {
 };
 
 
-// Wrap function f(...) return by Try<T>
+// Wrap function f(...) return by Try<T> 返回值不为void
 template <typename F, typename... Args>
 typename std::enable_if<
 !std::is_same<typename std::result_of<F (Args...)>::type, void>::value,

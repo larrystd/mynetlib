@@ -7,7 +7,7 @@
 #include <mutex>
 #include <chrono>
 
-///@file TimeUtil.h
+///@file TimeUtil.h 时间工具类, 时间戳
 namespace ananas {
 
 ///@brief Simple encapsulation for time point 时间戳

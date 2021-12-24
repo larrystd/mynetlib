@@ -5,30 +5,39 @@
 
 namespace ananas {
 
+// 本编译单元设置static变量, static初始化不再构造函数中,在全局
 unsigned int Coroutine::sid_ = 0;
 Coroutine Coroutine::main_;
 Coroutine* Coroutine::current_ = nullptr;
 
+/*
+实现协程依赖的四大函数
+int getcontext(ucontext_t *ucp);
+void makecontext(ucontext_t *ucp, void (*func)(), int argc, ...);
+int swapcontext(ucontext_t *oucp, ucontext_t *ucp);
+int setcontext(const ucontext_t *ucp);
+*/
+// 构造函数
 Coroutine::Coroutine(std::size_t size) :
-    id_( ++ sid_),
+    id_(++ sid_),
     state_(State::Init),
-    stack_(size > kDefaultStackSize ? size : kDefaultStackSize) {
+    stack_(size > kDefaultStackSize ? size : kDefaultStackSize) 
+{
     if (this == &main_) {
         std::vector<char>().swap(stack_);
-        return;
     }
 
     if (id_ == main_.id_)
-        id_ = ++ sid_;  // when sid_ overflow
-
+        id_ = ++sid_;
     int ret = ::getcontext(&handle_);
-    assert (ret == 0);
+    assert(ret == 0);
 
     handle_.uc_stack.ss_sp   = &stack_[0];
     handle_.uc_stack.ss_size = stack_.size();
     handle_.uc_link = 0;
 
     ::makecontext(&handle_, reinterpret_cast<void (*)(void)>(&Coroutine::_Run), 1, this);
+
 }
 
 Coroutine::~Coroutine() {

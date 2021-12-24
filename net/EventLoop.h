@@ -24,7 +24,7 @@ class Connector;
 ///@brief EventLoop class
 ///
 /// One thread should at most has one EventLoop object.
-class EventLoop : public Scheduler {
+class EventLoop : public Scheduler {    // EventLoop继承自Scheduler
 public:
     ///@brief Constructor
     EventLoop();
@@ -245,6 +245,7 @@ EventLoop::Execute(F&& f, Args&&... args) {
 }
 
 // F return void, loop执行函数
+// 这个用法是让loop调度执行F, 调用者持有future等待执行完毕即可
 template <typename F, typename... Args, typename >
 Future<void> EventLoop::Execute(F&& f, Args&&... args) {
 
@@ -255,10 +256,11 @@ Future<void> EventLoop::Execute(F&& f, Args&&... args) {
     auto future = promise.GetFuture();  // 从promise获得future对象
 
     if (InThisLoop()) {
-        std::forward<F>(f)(std::forward<Args>(args)...);
+        std::forward<F>(f)(std::forward<Args>(args)...);    // 本线程, 直接执行
         promise.SetValue();
     } else {
         auto task = std::bind(std::forward<F>(f), std::forward<Args>(args)...); // 要执行的任务
+        // func放入functors_执行, 执行完pm.SetValue();使future可以访问到
         auto func = [t = std::move(task), pm = std::move(promise)]() mutable {
             try {
                 t();

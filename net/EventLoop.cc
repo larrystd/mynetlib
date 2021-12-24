@@ -207,13 +207,13 @@ void EventLoop::Run() { // 主循环
     assert (this->InThisLoop());
 
     const DurationMs kDefaultPollTime(10);
-    const DurationMs kMinPollTime(1);
+    const DurationMs kMinPollTime(1);   // 最短的poll时间
 
     Register(internal::eET_Read, notifier_);   // notifier channel注册可读到poller中, 这个用来唤醒epoll_wait 
 
     // 主循环,执行_Loop
     while (!Application::Instance().IsExit()) {
-        auto timeout = std::min(kDefaultPollTime, timers_.NearestTimer());
+        auto timeout = std::min(kDefaultPollTime, timers_.NearestTimer());  // 最早的定时器时间
         timeout = std::max(kMinPollTime, timeout);
 
         _Loop(timeout);// 这个思想和redis类似, 在timeout时间下执行loop循环, 等超时了执行定时器
@@ -228,7 +228,7 @@ void EventLoop::Run() { // 主循环
     poller_.reset();
 }
 
-bool EventLoop::_Loop(DurationMs timeout) { // 一个loop循环
+bool EventLoop::_Loop(DurationMs timeout) { // 一个loop循环, timeout是最近的定时器时间
     ANANAS_DEFER {
         timers_.Update();   // 优先处理定时器, 保证不超时
 
@@ -265,7 +265,7 @@ bool EventLoop::_Loop(DurationMs timeout) { // 一个loop循环
         auto src = (internal::Channel* )fired[i].userdata;  // src是一个channel
         sources[i] = src->shared_from_this();
 
-        // 执行对应的回调函数
+        // 根据fired, 执行对应的回调函数, HandleReadEvent, HandleWriteEvent
         if (fired[i].events & internal::eET_Read) {
             if (!src->HandleReadEvent()) {
                 src->HandleErrorEvent();
@@ -302,6 +302,7 @@ void EventLoop::ScheduleLater(std::chrono::milliseconds duration,
     }
 }
 
+// 执行某个函数f
 void EventLoop::Schedule(std::function<void()> f) {
     Execute(std::move(f));
 }

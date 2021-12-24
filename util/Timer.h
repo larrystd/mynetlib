@@ -13,7 +13,7 @@ namespace ananas {
 
 using DurationMs = std::chrono::milliseconds;
 using TimePoint = std::chrono::steady_clock::time_point;    // 时间点class
-using TimerId = std::shared_ptr<std::pair<TimePoint, unsigned int> >;
+using TimerId = std::shared_ptr<std::pair<TimePoint, unsigned int> >;   // timepoint和int的pair, TimeId作为定时时间点存在, 根据TimePoint的值排序
 
 constexpr int kForever = -1;
 
@@ -35,7 +35,6 @@ public:
     TimerManager(const TimerManager& ) = delete;
     void operator= (const TimerManager& ) = delete;
 
-    // Tick
     void Update();
 
     ///@brief Schedule timer at absolute timepoint then repeat with period
@@ -45,17 +44,17 @@ public:
     ///@param args Args for f
     ///
     /// RepeatCount: Timer will be canceled after trigger RepeatCount times, kForever implies forever.
+    // 某个时刻执行, Duration, F, Args都是模板参数
     template <int RepeatCount, typename Duration, typename F, typename... Args>
     TimerId ScheduleAtWithRepeat(const TimePoint& triggerTime, const Duration& period, F&& f, Args&&... args);
-
     ///@brief Schedule timer with period
     ///@param period: Timer will be triggered every period
     ///
     /// RepeatCount: Timer will be canceled after triggered RepeatCount times, kForever implies forever.
     /// PAY ATTENTION: Timer's first trigger isn't at once, but after period time
-    template <int RepeatCount, typename Duration, typename F, typename... Args>
-    TimerId ScheduleAfterWithRepeat(const Duration& period, F&& f, Args&&... args);
 
+    template <int REpeatCount, typename Duration, typename F, typename... Args>
+    TimerId ScheduleAfterWithRepeat(const Duration& period, F&& f, Args&&... args);
     ///@brief Schedule timer at timepoint
     ///@param triggerTime: The absolute time when timer trigger
     ///
@@ -70,14 +69,14 @@ public:
     template <typename Duration, typename F, typename... Args>
     TimerId ScheduleAfter(const Duration& duration, F&& f, Args&&... args);
 
-    ///@brief Cancel timer
+    ///@brief Cancel timer, 
     bool Cancel(TimerId id);
 
     ///@brief how far the nearest timer will be trigger.
     DurationMs NearestTimer() const;
 
 private:
-    class Timer {
+    class Timer {   // 包装定时任务, TimerManage 管理的就算Timer对象
         friend class TimerManager;
     public:
         explicit
@@ -91,7 +90,7 @@ private:
         void operator= (const Timer& ) = delete;
 
         template <typename F, typename... Args>
-        void SetCallback(F&& f, Args&&... args);
+        void SetCallback(F&& f, Args&&... args);    // 定时任务
 
         void OnTimer();
 
@@ -103,43 +102,44 @@ private:
 
         TimerId id_;
 
-        std::function<void ()> func_;
+        std::function<void ()> func_;   // 绑定的函数, 返回值为void, 没有要输入的值(输入的值需要用占位符std::placeholder::_1)
         DurationMs interval_;
-        int count_;
+        int count_; // 重复次数
     };
 
-    std::multimap<TimePoint, Timer> timers_;    // 定时器, 通过multimap, 根据TimePoint时间点排序
+    // 定时器, 通过multimap, 根据TimePoint时间点排序
+    // multimap可以允许重复key, 但不支持operator[]索引
+    // TimePoint是要执行的时刻
+    std::multimap<TimePoint, Timer> timers_;    // 定时任务, 按照TimePoint排序
 
-    // multimap 可以保存重复key, 不支持operator[]因为有重复key
     friend class Timer;
 
     // not thread-safe, but who cares?
     static unsigned int s_timerIdGen_;
 };
 
-
-template <int RepeatCount, typename Duration, typename F, typename... Args>
+// 对于函数模板,例如ScheduleAtWithRepeat, 实现也在.h中
+template <int RepeatCount, typename Duration,typename F, typename... Args>
 TimerId TimerManager::ScheduleAtWithRepeat(const TimePoint& triggerTime, const Duration& period, F&& f, Args&&... args) {
-    static_assert(RepeatCount != 0, "Why you add a timer with zero count?");
+    static_assert(RepeatCount != 0, "RepeatCount cannot set zero!");
 
     using namespace std::chrono;
-
     Timer t(triggerTime);
-    // precision: milliseconds
     t.interval_ = std::max(DurationMs(1), duration_cast<DurationMs>(period));
     t.count_ = RepeatCount;
     TimerId id = t.Id();
 
     t.SetCallback(std::forward<F>(f), std::forward<Args>(args)...);
-    timers_.insert(std::make_pair(triggerTime, std::move(t)));
+    timers_.insert(std::make_pair(triggerTime, std::move(t)));  // pair(triggerTime, timer)
+
     return id;
 }
 
-template <int RepeatCount, typename Duration, typename F, typename... Args>
+template<int RepeatCount, typename Duration, typename F, typename... Args>
 TimerId TimerManager::ScheduleAfterWithRepeat(const Duration& period, F&& f, Args&&... args) {
-    const auto now = std::chrono::steady_clock::now();
+    const auto now = std::chrono::steady_clock::now();  // RepeatCount执行次数
     return ScheduleAtWithRepeat<RepeatCount>(now + period,
-                                             period,
+                                             period,    // 周期执行
                                              std::forward<F>(f),
                                              std::forward<Args>(args)...);
 }

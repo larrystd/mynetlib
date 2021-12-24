@@ -13,14 +13,14 @@ TimerManager::TimerManager() {
 TimerManager::~TimerManager() {
 }
 
-void TimerManager::Update() {
+void TimerManager::Update() {   // 这里由loop调用, 目的是处理定时器的任务
     if (timers_.empty())
         return;
 
     const auto now = std::chrono::steady_clock::now();
 
-    for (auto it(timers_.begin()); it != timers_.end(); ) {
-        if (it->first > now)
+    for (auto it(timers_.begin()); it != timers_.end(); ) { // 访问timers_ mulitmap
+        if (it->first > now)    // 时刻不能晚于now
             return;
 
         // support cancel self
@@ -30,7 +30,7 @@ void TimerManager::Update() {
         Timer timer(std::move(it->second));
         it = timers_.erase(it);
 
-        if (timer.count_ != 0) {
+        if (timer.count_ != 0) {    // 重新加入定时器
             // need reschedule
             const auto tp = timer.id_->first;
             auto itNew = timers_.insert(std::make_pair(tp, std::move(timer)));  // 插入到定时器
@@ -40,7 +40,7 @@ void TimerManager::Update() {
     }
 }
 
-bool TimerManager::Cancel(TimerId id) {
+bool TimerManager::Cancel(TimerId id) { // 根据id删除timer_列表的pair
     //time point + uid
     auto begin = timers_.lower_bound(id->first);
     if (begin == timers_.end())
@@ -58,7 +58,7 @@ bool TimerManager::Cancel(TimerId id) {
     return false;
 }
 
-DurationMs TimerManager::NearestTimer() const {
+DurationMs TimerManager::NearestTimer() const { // 最近的一个Timer, poll等待时刻必须少于near Timer, 防止定时器超时
     if (timers_.empty())
         return DurationMs::max();
 
@@ -94,11 +94,11 @@ void TimerManager::Timer::_Move(Timer&& timer) {
 }
 
 
-void TimerManager::Timer::OnTimer() {
+void TimerManager::Timer::OnTimer() {   // Timer的
     if (!func_ || count_ == 0)
         return;
 
-    if (count_ == kForever || count_-- > 0) {
+    if (count_ == kForever || count_-- > 0) {   // 还有重复次数, 执行
         func_();
         id_->first += interval_;
     } else {

@@ -7,15 +7,12 @@ Time::Time() : valid_(false) {
     this->Now();
 }
 
+
 int64_t Time::MilliSeconds() const {
     return std::chrono::duration_cast<std::chrono::milliseconds>(now_.time_since_epoch()).count();
 }
 
-int64_t Time::MicroSeconds() const {
-    return std::chrono::duration_cast<std::chrono::microseconds>(now_.time_since_epoch()).count();
-}
-
-void Time::Now() {
+void Time::Now() {  // 设置当前时刻
     now_ = std::chrono::system_clock::now();
     valid_ = false;
 }
@@ -27,7 +24,7 @@ void Time::_UpdateTm()  const {
 
     valid_ = true;
     const time_t now(MilliSeconds() / 1000UL);
-    ::localtime_r(&now, &tm_);
+    ::localtime_r(&now, &tm_);  // 当地的当前时间
 }
 
 std::once_flag Time::init_;
@@ -54,16 +51,17 @@ void Time::Init() {
     }
 }
 
+// 格式化时间
 std::size_t Time::FormatTime(char* buf) const {
     std::call_once(init_, &Time::Init);
 
-    _UpdateTm();
+    _UpdateTm();    // 更新当前时间
 
     memcpy(buf, YEAR[tm_.tm_year + 1900 - 2015], 4);
     buf[4] = '-';
-    memcpy(buf + 5, NUMBER[tm_.tm_mon + 1], 2);
+    memcpy(buf+5, NUMBER[tm_.tm_mon + 1], 2);
     buf[7] = '-';
-    memcpy(buf + 8, NUMBER[tm_.tm_mday], 2);
+    memcpy(buf+8, NUMBER[tm_.tm_mday], 2);
     buf[10] = '[';
     memcpy(buf + 11, NUMBER[tm_.tm_hour], 2);
     buf[13] = ':';
@@ -72,9 +70,9 @@ std::size_t Time::FormatTime(char* buf) const {
     memcpy(buf + 17, NUMBER[tm_.tm_sec], 2);
     buf[19] = '.';
     auto msec = MicroSeconds();
-    snprintf(buf + 20, 8, "%06d]", static_cast<int>(msec % 1000000));
-
-    return 27;
+    snprintf(buf + 20, 8 , "%06d]", static_cast<int>(msec % 1000000));
+    
+    return 27;  // 占用27个字节
 }
 
 } // end namespace ananas

@@ -15,33 +15,31 @@ namespace ananas {
 
 namespace internal {
 
-enum class Progress {
+enum class Progress {   
     None,
     Timeout,
     Done,
     Retrieved,
 };
 
-using TimeoutCallback = std::function<void ()>;
+using TimeoutCallback = std::function<void ()>; // 超时回调
 
 template <typename T>
-struct State {  // 多线程共享变量
+struct State {  // 线程的共享变量, 为promise和future传递信息使用
     static_assert(std::is_same<T, void>::value ||
-                  std::is_copy_constructible<T>() ||
-                  std::is_move_constructible<T>() ||
-                  "must be copyable or movable or void");   // 检查类型
-    State() :
-        progress_(Progress::None),
-        retrieved_ {false} {
-    
+                std::is_copy_constructible<T>() ||
+                std::is_move_constructible<T>() ||
+                "must be copyable or movable or void"); // 检查类型, 必须是void, 或者可拷贝, 或者可move    
+    State() : progress_(Progress::None), retrieved_ {false} {
+
     }
-    std::mutex thenLock_;
-    using ValueType = typename TryWrapper<T>::Type; //value类型
+    std::mutex thenLock_;   // 互斥器
+    using ValueType = typename TryWrapper<T>::Type; // T是共享变量类型
     ValueType value_;
-    std::function<void (ValueType&& )> then_;   // function
+    std::function<void (ValueType&& )> then_;   
     Progress progress_;
 
-    std::function<void (TimeoutCallback&& )> onTimeout_;
+    std::function<void(TimeoutCallback&& )> onTimeout_; // 回调函数
     std::atomic<bool> retrieved_;
 };
 
@@ -54,15 +52,14 @@ class Future;   // 前向声明
 using namespace internal;
 
 template <typename T>
-class Promise { // Promise class
-public:
-    Promise() :
-        state_(std::make_shared<State<T>>()) {
+class Promise {
+ public:
+    // state_在创建Promise时也创建了
+    Promise() : state_(std::make_shared<State<T>>()) {
+
     }
 
-    // The lambda with movable capture can not be stored in
-    // std::function, just for compile, do NOT copy promise!
-    Promise(const Promise& ) = default;
+    Promise(const Promise&) = default;  // 允许拷贝构造
     Promise& operator= (const Promise& ) = default;
 
     Promise(Promise&& pm) = default;
@@ -70,76 +67,68 @@ public:
 
     void SetException(std::exception_ptr exp) {
         std::unique_lock<std::mutex> guard(state_->thenLock_);
+
         if (state_->progress_ != Progress::None)
             return;
-
         state_->progress_ = Progress::Done;
         state_->value_ = typename State<T>::ValueType(std::move(exp));
         guard.unlock();
 
-        if (state_->then_)
-            state_->then_(std::move(state_->value_));
+        if (state_->then_) 
+            state_->then(std::move(state_->value_));
     }
 
-    template <typename SHIT = T>
-    typename std::enable_if<!std::is_void<SHIT>::value, void>::type // SHIT不是void类型
-    SetValue(SHIT&& t) {    // t参数一般是执行的函数类型
-        // If ThenImp is running, here will wait for the lock.
-        // After set then_, ThenImp will release lock.
-        // And this func got lock, definitely will call then_.
-        std::unique_lock<std::mutex> guard(state_->thenLock_);  // 设置值到共享变量中, 要上锁
-        if (state_->progress_ != Progress::None)
-            return;
-
-        state_->progress_ = Progress::Done;
-        state_->value_ = std::forward<SHIT>(t); // value
-
-        guard.unlock();
-
-        // When reach here, state_ is determined, so mutex is useless
-        // If the ThenImp function run, it'll see the Done state and
-        // call user func there, not assign to then_.
-        if (state_->then_)
-            state_->then_(std::move(state_->value_));   // 执行state_->value函数
-    }
-
-    template <typename SHIT = T>
-    typename std::enable_if<std::is_void<SHIT>::value, void>::type
-    SetValue() {
+    template <typename SHIT = T>    // SHIT类型不是void
+    typename std::enable_if<!std::is_void<SHIT>::value, void>::type
+    SetValue(SHIT&& t) {
         std::unique_lock<std::mutex> guard(state_->thenLock_);
         if (state_->progress_ != Progress::None)
             return;
-
         state_->progress_ = Progress::Done;
-        state_->value_ = Try<void>();
+        state_->value_ = std::forward<SHIT>(t); // 设置value到state_中
 
         guard.unlock();
+
         if (state_->then_)
+            state_->then_(std::move(state_->value_));   // 执行state_->value函数, value是参数
+    }
+
+    template <typename SHIT = T>    // SHIT为void
+    typename std::enable_if<std::is_void<SHIT>::value, void>::type
+    SetValue() {
+        std::unqiue_lock<std::mutex> guard(state_->thenLock_);
+        if (state_->progress_ != Progress::None)
+            return;
+
+        state_->progress_ = Progress::Done;
+        state_->value_ = Try<void>();   // 设置value
+
+        guard.unlock();
+        if (state_->then_)  // 存在state_->then_函数, 则state_->value作为参数
             state_->then_(std::move(state_->value_));
     }
 
-    Future<T> GetFuture() { // 返回Future对象
+    Future<T> GetFuture() { // 获得future对象
         bool expect = false;
         if (!state_->retrieved_.compare_exchange_strong(expect, true)) {
             throw std::runtime_error("Future already retrieved");
         }
-
-        return Future<T>(state_);   // 获取全局变量state_, 并封装为Future
+        return Future<T>(state_);   // 用state和T封装成Future对象
     }
 
     bool IsReady() const {
         return state_->progress_ != Progress::None;
     }
 
-private:
-    std::shared_ptr<State<T>> state_;   // 状态, 是一个全局变量, 多线程共享的
+ private:
+    std::shared_ptr<State<T>> state_;   // 全局变量状态state
 };
 
 template <typename T2>
 Future<T2> MakeExceptionFuture(std::exception_ptr&& );
 
 template <typename T>
-class Future {  // 封装多线程之共享变量, 可读取State
+class Future {  // Fututr对象, 封装多线程之共享变量State
 public:
     using InnerType = T;
 
@@ -169,50 +158,54 @@ public:
     // 等待
     typename State<T>::ValueType
     Wait(const std::chrono::milliseconds& timeout = std::chrono::milliseconds(24*3600*1000)) {
-
         std::unique_lock<std::mutex> guard(state_->thenLock_);
         switch (state_->progress_) {
-            case Progress::None:
+            case Progress::None:    // 继续向下执行
                 break;
-
+            
             case Progress::Timeout:
                 throw std::runtime_error("Future timeout");
-
             case Progress::Done:
                 state_->progress_ = Progress::Retrieved;
-                return std::move(state_->value_);
-
+                return std::move(state_->value_);   // 线程执行完, 返回value
             default:
                 throw std::runtime_error("Future already retrieved");
         }
+        // Progress::None, 执行函数
         guard.unlock();
 
         auto cond(std::make_shared<std::condition_variable>());
         auto mutex(std::make_shared<std::mutex>());
+
         bool ready = false;
         typename State<T>::ValueType value;
 
+        // 调用Future->Then
         this->Then([&value, &ready,
                     wcond = std::weak_ptr<std::condition_variable>(cond),
-                    wmutex = std::weak_ptr<std::mutex>(mutex)](typename State<T>::ValueType&& v)
-                   {
-                       auto cond = wcond.lock();
-                       auto mutex = wmutex.lock();
-                       if (!cond || !mutex) return;
-
-                       std::unique_lock<std::mutex> guard(*mutex);
-                       value = std::move(v);
-                       ready = true;
-                       cond->notify_one();
-                   });
-
+                    wmutex = std::weak_ptr<std::mutex>(mutex)]
+                    (typename State<T>::ValueType&& v)
+                {
+                    auto cond = wcond.lock();
+                    auto mutex = wmutex.lock();
+                    if (!cond || !mutex)
+                        return;
+                    std::unique_lock<std::mutex> guard(*mutex);
+                    value = std::move(v);
+                    ready = true;
+                    cond->notify_one;
+                });
+        
         std::unique_lock<std::mutex> waiter(*mutex);
-        bool success = cond->wait_for(waiter, timeout, [&ready]() { return ready; } );
+
+        // 等待直到返回ready=true或者超时
+        bool success = cond->wait_for(wait, timeout, [&ready]() { return ready; });
+        
         if (success)
             return std::move(value);
         else
-            throw std::runtime_error("Future wait_for timeout");
-     }
+            return std::runtime_error("Future wait_for timeout");
+    }
 
     // T is of type Future<InnerType>
     template <typename SHIT = T>
@@ -255,14 +248,14 @@ public:
         return fut;
     }
 
+    // 似乎封装成一个_ThenImpl<F, R>
     template <typename F,
-              typename R = CallableResult<F, T> >
+            typename R = CallableResult<F, T>>
     auto Then(F&& f) -> typename R::ReturnFutureType {
-        typedef typename R::Arg Arguments;
         return _ThenImpl<F, R>(nullptr, std::forward<F>(f), Arguments());
     }
 
-    // f will be called in sched 调用
+    // f will be called in sched 多传入一个参数Scheduler
     template <typename F,
               typename R = CallableResult<F, T> >
     auto Then(Scheduler* sched, F&& f) -> typename R::ReturnFutureType {
@@ -272,37 +265,38 @@ public:
 
     //1. F does not return future type
     template <typename F, typename R, typename... Args>
-    typename std::enable_if<!R::IsReturnsFuture::value, typename R::ReturnFutureType>::type
+    typename std::enable_if<!R::IsReturnFuture::value, typename R::ReturnFutureType>::Type
     _ThenImpl(Scheduler* sched, F&& f, ResultOfWrapper<F, Args...> ) {
-        static_assert(sizeof...(Args) <= 1, "Then must take zero/one argument");
+        static_assert(sizeof... (Args) <= 1,  "Then must take zero/one argument");
 
         using FReturnType = typename R::IsReturnsFuture::Inner;
 
         Promise<FReturnType> pm;
-        auto nextFuture = pm.GetFuture();   // 获得future
+        auto nextFuture = pm.GetFuture();   // future对象
 
-        using FuncType = typename std::decay<F>::type;
+        using FuncType = typename std::decay<F>::type;  // 退化&, *符号
 
         std::unique_lock<std::mutex> guard(state_->thenLock_);
         if (state_->progress_ == Progress::Timeout) {
             throw std::runtime_error("Wrong state : Timeout");
-        } else if (state_->progress_ == Progress::Done) {
+        } else if (state_->progress_ == Progress::Done) {   // Progress::Done, promise向state_ set了value
             typename TryWrapper<T>::Type t;
             try {
-                t = std::move(state_->value_);
-            } catch(const std::exception& e) {
+                t = std::move(state_ -> value_);    // 获得state_->value_, t
+            } catch (const std::exception& e) {
                 t = (typename TryWrapper<T>::Type)(std::current_exception());
             }
 
             guard.unlock();
 
             if (sched) {
+                // 额是通过调用sched->Schedule
                 sched->Schedule([t = std::move(t),
-                                 f = std::forward<FuncType>(f),
-                                 pm = std::move(pm)]() mutable {
-                                     auto result = WrapWithTry(f, std::move(t));
-                                     pm.SetValue(std::move(result));
-                                 });
+                                f = std::forward<FuncType>(f),
+                                pm = std::move(pm)] () mutable {
+                                    auto result = WrapWithTry(f, std::move(t));
+                                    pm.SetValue(std::move(result));
+                                })
             } else {
                 auto result = WrapWithTry(f, std::move(t));
                 pm.SetValue(std::move(result));
@@ -325,7 +319,7 @@ public:
                     // run callback, T can be void, thanks to folly Try<>
                     auto result = WrapWithTry(func, std::move(t));
                     // set next future's result
-                    prom.SetValue(std::move(result));   // 设置变量
+                    prom.SetValue(std::move(result));   // 设置变量(promise可以访问了)
                 }
             });
         }
@@ -336,8 +330,8 @@ public:
     //2. F return another future type
     template <typename F, typename R, typename... Args>
     typename std::enable_if<R::IsReturnsFuture::value, typename R::ReturnFutureType>::type
-    _ThenImpl(Scheduler* sched, F&& f, ResultOfWrapper<F, Args...>) {
-        static_assert(sizeof...(Args) <= 1, "Then must take zero/one argument");
+    _ThenImpl(Scheduler* sched, F&& f, ResultOfWrapper<F, Args... >) {
+        static_assert(sizeof... (Args) <= 1,"Then must take zero/one argument");
 
         using FReturnType = typename R::IsReturnsFuture::Inner;
 
@@ -349,12 +343,12 @@ public:
         std::unique_lock<std::mutex> guard(state_->thenLock_);
         if (state_->progress_ == Progress::Timeout) {
             throw std::runtime_error("Wrong state : Timeout");
-        } else if (state_->progress_ == Progress::Done) {
+        }else if (state_->progress_ == Progress::Done) {
             typename TryWrapper<T>::Type t;
             try {
                 t = std::move(state_->value_);
-            } catch(const std::exception& e) {
-                t = decltype(t)(std::current_exception());
+            } catch (const std::exception& e) {
+                t = dectype(t)(std::current_exception());
             }
 
             guard.unlock();
@@ -395,11 +389,11 @@ public:
                 }
             };
 
-            if (sched)
+            if (sched) 
                 sched->Schedule(std::move(cb));
-            else
+            else 
                 cb();
-        } else {
+        }else {
             // set this future's then callback
             _SetCallback([sched = sched,
                          func = std::forward<FuncType>(f),
@@ -470,10 +464,11 @@ public:
      * 3. xx and yy are called, it's the normal case.
      * So, you may shouldn't use OnTimeout with chained futures!!!
      */
+    // 超时回调函数, 调用TimeoutCallback f
     void OnTimeout(std::chrono::milliseconds duration,
-                   TimeoutCallback f,
-                   Scheduler* scheduler) {
-
+                TimeoutCallback f,
+                Scheduler* scheduler) {
+        
         scheduler->ScheduleLater(duration, [state = state_, cb = std::move(f)]() mutable {
             std::unique_lock<std::mutex> guard(state->thenLock_);
             if (state->progress_ != Progress::None)
@@ -487,20 +482,22 @@ public:
     }
 
 private:
+    // 设置回调函数, state_->then_
     void _SetCallback(std::function<void (typename TryWrapper<T>::Type&& )>&& func) {
         state_->then_ = std::move(func);
     }
 
+    // 超时回调函数
     void _SetOnTimeout(std::function<void (TimeoutCallback&& )>&& func) {
         state_->onTimeout_ = std::move(func);
     }
 
-
     std::shared_ptr<State<T>> state_;   // Future内部维护的共享变量state
 };
 
-// Make ready future
-template <typename T2>  // 函数模板, 模板需要匹配所有<>中的元素, 包括T2, typename std::decay<T2>::type
+// Make ready future, 用T2 创建Promise, 返回future对象
+// 函数模板, 模板需要匹配所有<>中的元素, 包括T2, typename std::decay<T2>::type
+template <typename T2>  
 inline Future<typename std::decay<T2>::type> MakeReadyFuture(T2&& value) {
     Promise<typename std::decay<T2>::type> pm;
     auto f(pm.GetFuture());
@@ -509,7 +506,8 @@ inline Future<typename std::decay<T2>::type> MakeReadyFuture(T2&& value) {
     return f;
 }
 
-inline Future<void> MakeReadyFuture() { // 函数模板特化, 模板满足void
+// 函数模板特化, 模板满足void
+inline Future<void> MakeReadyFuture() { 
     Promise<void> pm;
     auto f(pm.GetFuture());
     pm.SetValue();

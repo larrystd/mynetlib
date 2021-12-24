@@ -85,6 +85,8 @@
         "csignal": "cpp",
         "__errc": "cpp",
         "__node_handle": "cpp",
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        "*.def": "cpp",
+        "local_type_traits": "cpp"
     }
 }

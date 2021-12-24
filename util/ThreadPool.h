@@ -150,14 +150,14 @@ auto ThreadPool::Execute(F&& f, Args&&... args) -> Future<void> {
             t();
             pm.SetValue();  // 子线程设置值
         } catch(...) {  // matches exceptions of any type.
-            pm.SetException(std::current_exception());
+            pm.SetException(std::current_exception());  // 设置异常
         }
     };
 
     tasks_.emplace_back(std::move(task));   // 任务加入任务列表(让子线程自动执行)
     cond_.notify_one(); // 唤醒一个子线程执行，因为任务列表有任务了, 唤醒一个就行
 
-    return future;  // future是子线程运行完的生成对象, 包含子线程的setvalue
+    return future;  // future可以获得异步执行线程的状态, 事实上没有用到
 }
 
 } // namespace ananas

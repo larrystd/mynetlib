@@ -21,7 +21,7 @@ int main(int ac, char* av[]) {
         INF(log1) << "Hello, test timer...";
     });
 
-    // shutdown after 7s
+    // shutdown after 7s 7s后执行退出
     loop.ScheduleAfter(std::chrono::seconds(7), [&app]() {
         WRN(log1) << "Now stop app.";
         app.Exit();

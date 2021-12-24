@@ -173,7 +173,7 @@ void Connector::_OnSuccess() {
     loop->Execute(std::move(func));
 }
 
-void Connector::_OnFailed() {
+void Connector::_OnFailed() {   // 连接失败回调函数
     assert (state_ != ConnectState::connected);
 
     const auto oldState = state_;
@@ -193,12 +193,13 @@ void Connector::_OnFailed() {
             onConnectFail_(loop, peer_);
     };
 
-    loop->Execute(std::move(onFail))
+    loop->Execute(std::move(onFail))    // loop->Execute返回一个future对象, 调用future.Then
     .Then(loop_, [&, oldState]() {
         // must be called in loop_
         if (oldState == ConnectState::connecting)
             loop_->Unregister(eET_Write, shared_from_this());
     });
+    // 调度执行lambda函数, 
 }
 
 } // namespace internal

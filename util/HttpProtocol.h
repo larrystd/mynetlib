@@ -34,7 +34,7 @@ public:
     // Shallow copy
     std::vector<iovec> EncodeLite() const;
 
-    bool SetMethod(const std::string& m) {
+    bool SetMethod(const std::string& m) {  // HTTP请求方法
         assert(method_ == HttpMethod::Invalid);
 
         if (m == "GET")
@@ -142,7 +142,7 @@ private:
 };
 
 
-class HttpRequestParser {
+class HttpRequestParser {   // 解析http请求协议
 public:
     void Reset();
     bool ParseRequest(const char*& ptr, const char* end);
@@ -171,7 +171,7 @@ private:
     HttpRequest request_;
 };
 
-enum HttpCode {
+enum HttpCode { // http响应状态码
     OK = 200,
     Created = 201,
     Accepted = 202,
@@ -257,7 +257,7 @@ private:
 };
 
 
-class HttpResponseParser {
+class HttpResponseParser {  // http响应的解析
 public:
     void Reset();
     bool ParseResponse(const char*& ptr, const char* end);

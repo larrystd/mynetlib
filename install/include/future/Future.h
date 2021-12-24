@@ -53,6 +53,7 @@ class Future;   // 前向声明
 
 using namespace internal;
 
+// Future的基本是, Promise和Future共同可以访问state_对象, 利用共享内存实现信息传递
 template <typename T>
 class Promise { // Promise class
 public:
@@ -103,6 +104,7 @@ public:
             state_->then_(std::move(state_->value_));   // 执行state_->value函数
     }
 
+    // 设置state_->value_ = Try<void>();
     template <typename SHIT = T>
     typename std::enable_if<std::is_void<SHIT>::value, void>::type
     SetValue() {
@@ -110,8 +112,8 @@ public:
         if (state_->progress_ != Progress::None)
             return;
 
-        state_->progress_ = Progress::Done;
-        state_->value_ = Try<void>();
+        state_->progress_ = Progress::Done; // state_设置了值, 设置Progress::Done
+        state_->value_ = Try<void>();   // 设置value_为Try<void>(), 是一个Try<void>()对象
 
         guard.unlock();
         if (state_->then_)
@@ -139,7 +141,7 @@ template <typename T2>
 Future<T2> MakeExceptionFuture(std::exception_ptr&& );
 
 template <typename T>
-class Future {  // 封装多线程之共享变量, 可读取State
+class Future {  // 封装多线程之共享变量, 可读取State。Future一般通过promise获得，从而可以和promise访问同一个state_
 public:
     using InnerType = T;
 
@@ -262,7 +264,8 @@ public:
         return _ThenImpl<F, R>(nullptr, std::forward<F>(f), Arguments());
     }
 
-    // f will be called in sched 调用
+    // f will be called in sched 调用future, Then
+    // Scheduler是调度对象, 例如eventloop
     template <typename F,
               typename R = CallableResult<F, T> >
     auto Then(Scheduler* sched, F&& f) -> typename R::ReturnFutureType {
@@ -286,10 +289,10 @@ public:
         std::unique_lock<std::mutex> guard(state_->thenLock_);
         if (state_->progress_ == Progress::Timeout) {
             throw std::runtime_error("Wrong state : Timeout");
-        } else if (state_->progress_ == Progress::Done) {
+        } else if (state_->progress_ == Progress::Done) {   // 说明promise已经设置好的state的值
             typename TryWrapper<T>::Type t;
             try {
-                t = std::move(state_->value_);
+                t = std::move(state_->value_);  // Progress::Done, 并且已经设置好了state_
             } catch(const std::exception& e) {
                 t = (typename TryWrapper<T>::Type)(std::current_exception());
             }
@@ -302,13 +305,14 @@ public:
                                  pm = std::move(pm)]() mutable {
                                      auto result = WrapWithTry(f, std::move(t));
                                      pm.SetValue(std::move(result));
-                                 });
-            } else {
+                                 });    // 调度执行
+            } else {    // sched为nullptr
+                // f为Try<void>, 执行
                 auto result = WrapWithTry(f, std::move(t));
-                pm.SetValue(std::move(result));
+                pm.SetValue(std::move(result)); // 设置pm
             }
         } else {
-            // set this future's then callback
+            // set this future's then callback 设置回调函数, 即state_->then_
             _SetCallback([sched,
                          func = std::forward<FuncType>(f),
                          prom = std::move(pm)](typename TryWrapper<T>::Type&& t) mutable {

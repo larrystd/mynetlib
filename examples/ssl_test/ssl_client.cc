@@ -1,6 +1,6 @@
 #include <iostream>
 #include <openssl/ssl.h>
-#include <openssl/err.h>
+#include <openssl/err.h>    // 利用openssl分析验证证书
 #include "ssl/SSLContext.h"
 #include "ssl/SSLManager.h"
 #include "net/EventLoop.h"
@@ -56,6 +56,7 @@ int main(int ac, char* av[]) {
 
     int maxTryCount = 0;
     auto& app = ananas::Application::Instance();
+    // 连接回调函数是NewSSLConnection
     app.Connect("loopback", kPort, std::bind(NewSSLConnection,
                 ctx,
                 SSL_VERIFY_PEER,

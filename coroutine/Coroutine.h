@@ -12,13 +12,13 @@
 
 namespace ananas {
 
-using AnyPointer = std::shared_ptr<void>;
+using AnyPointer = std::shared_ptr<void>;   // shared_ptr维护的void指针
 
 class Coroutine;
 using CoroutinePtr = std::shared_ptr<Coroutine>;
 
-class Coroutine {
-    enum class State {
+class Coroutine {   // 协程
+    enum class State {  // 协程的状态
         Init,
         Running,
         Finish,
@@ -47,14 +47,14 @@ public:
     explicit
     Coroutine(std::size_t stackSize = 0);
 
-    // if F return void
+    // F执行的返回值类型是void 用F, Args... 构建Coroutine
     template <typename F, typename... Args,
-              typename = typename std::enable_if<std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type, typename Dummy = void>
+            typename = typename std::enable_if<std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type, typename Dummy = void>
     Coroutine(F&& f, Args&&... args) : Coroutine(kDefaultStackSize) {
         func_ = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
     }
 
-    // if F return non-void
+    // if F 执行后return non-void
     template <typename F, typename... Args,
               typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type>
     Coroutine(F&& f, Args&&... args) : Coroutine(kDefaultStackSize) {
@@ -64,7 +64,7 @@ public:
         auto temp = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
         func_ = [temp, me] () mutable {
             me->result_ = std::make_shared<ResultType>(temp());
-        };
+        };  // std::function, 执行后设置了this->result_
     }
 
     ~Coroutine();
@@ -99,7 +99,7 @@ private:
 
     HANDLE handle_;
     std::function<void ()> func_;
-    AnyPointer result_;
+    AnyPointer result_; // 运行的结果
 
     static Coroutine main_;
     static Coroutine* current_;

@@ -85,6 +85,7 @@ private:
 #undef ANANAS_DEFER
 #define ANANAS_DEFER _MAKE_DEFER_(__LINE__)
 
+// inline函数放在.h文件中, 目的是所有使用inline函数的编译单元都有定义, 不能通过链接实现inline
 
 inline
 std::vector<std::string> SplitString(const std::string& str, char seperator) {
@@ -92,18 +93,16 @@ std::vector<std::string> SplitString(const std::string& str, char seperator) {
 
     std::string::size_type start = 0;
     std::string::size_type sep = str.find(seperator);
-    while (sep != std::string::npos) {
+    while (sep != std::string::npos) {  // std::string::npos是针对于索引的, 地址为迭代器end()   
         if (start < sep)
-            results.emplace_back(str.substr(start, sep - start));
-
+            results.emplace_back(str.substr(start, sep-start));
         start = sep + 1;
         sep = str.find(seperator, start);
     }
 
-    if (start != str.size())
+    if (start != str.size()) 
         results.emplace_back(str.substr(start));
-
-    return results;
+    return results; // vector<string>
 }
 
 } // end namespace ananas
