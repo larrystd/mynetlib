@@ -1,7 +1,7 @@
-#ifndef BERT_COROUTINE_H
-#define BERT_COROUTINE_H
+#ifndef BERT_COROUTINE_H_
+#define BERT_COROUTINE_H_
 
-// Only linux 额协程
+// Only linux 额协程, 封装C语言的uncontext.h库的有栈协程
 
 #include <ucontext.h>
 
@@ -15,7 +15,7 @@ namespace ananas {
 using AnyPointer = std::shared_ptr<void>;   // shared_ptr维护的void指针
 
 class Coroutine;
-using CoroutinePtr = std::shared_ptr<Coroutine>;
+using CoroutinePtr = std::shared_ptr<Coroutine>;    // 维护协程的shared_ptr
 
 class Coroutine {   // 协程
     enum class State {  // 协程的状态
@@ -25,16 +25,18 @@ class Coroutine {   // 协程
     };
 
 public:
-    // works like python decorator: convert the func to a coroutine
+
+// 使用可变模板参数表示执行函数类型F的参数类型Args, 同样的还有Args&&... 用了可变形参
+// 静态变量
     template <typename F, typename... Args>
-    static CoroutinePtr
+    static CoroutinePtr 
     CreateCoroutine(F&& f, Args&&... args) {
         return std::make_shared<Coroutine>(std::forward<F>(f), std::forward<Args>(args)...);
     }
-
+ 
     // Below three static functions for schedule coroutine
 
-    // like python generator's send method
+    // 类似python 生成器的关键字
     static AnyPointer Send(const CoroutinePtr& crt, AnyPointer = AnyPointer(nullptr));
     static AnyPointer Yield(const AnyPointer& = AnyPointer(nullptr));
     static AnyPointer Next(const CoroutinePtr& crt);
@@ -47,24 +49,24 @@ public:
     explicit
     Coroutine(std::size_t stackSize = 0);
 
-    // F执行的返回值类型是void 用F, Args... 构建Coroutine
-    template <typename F, typename... Args,
+    // 如果F(Args) 返回值是void, 调用这个函数生成func_
+    template <typename F, typename... Args, 
             typename = typename std::enable_if<std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type, typename Dummy = void>
     Coroutine(F&& f, Args&&... args) : Coroutine(kDefaultStackSize) {
         func_ = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
     }
 
-    // if F 执行后return non-void
+    // F(Args)执行返回后不是void类型, 会设置Coroutine object的result_成员作为执行返回的结果
     template <typename F, typename... Args,
-              typename = typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type>
+            typename =  typename std::enable_if<!std::is_void<typename std::result_of<F (Args...)>::type>::value, void>::type>
     Coroutine(F&& f, Args&&... args) : Coroutine(kDefaultStackSize) {
         using ResultType = typename std::result_of<F (Args...)>::type;
 
         auto me = this;
-        auto temp = std::bind(std::forward<F>(f), std::forward<Args>(args)...);
-        func_ = [temp, me] () mutable {
+        auto temp = std::bind(std::forward<F>(f), std::forward<Args>(args)...);     // 绑定了F(Args)
+        func_ = [temp, me]() mutable {  // 这个lambda表达式对象是mutable的
             me->result_ = std::make_shared<ResultType>(temp());
-        };  // std::function, 执行后设置了this->result_
+        };
     }
 
     ~Coroutine();
@@ -84,6 +86,7 @@ public:
     }
 
 private:
+// 内部实现函数, 实现了静态函数Send, Yield, Run
     AnyPointer _Send(Coroutine* crt, AnyPointer = AnyPointer(nullptr));
     AnyPointer _Yield(const AnyPointer& = AnyPointer(nullptr));
     static void _Run(Coroutine* cxt);
@@ -95,18 +98,17 @@ private:
     typedef ucontext_t HANDLE;
 
     static const std::size_t kDefaultStackSize = 8 * 1024;
-    std::vector<char> stack_;
+    std::vector<char> stack_;   // 栈, 用来存储协程上下文
 
     HANDLE handle_;
     std::function<void ()> func_;
-    AnyPointer result_; // 运行的结果
+    AnyPointer result_; // F(Args)执行得到的结果
 
     static Coroutine main_;
     static Coroutine* current_;
     static unsigned int sid_;
 };
 
-} // end namespace ananas
+} // namespace ananas
 
 #endif
-

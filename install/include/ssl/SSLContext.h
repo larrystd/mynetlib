@@ -16,7 +16,7 @@ class Connection;
 
 namespace ssl {
 
-// SSL connection回调函数, 是全局函数
+// SSL connection回调函数
 void OnNewSSLConnection(const std::string& ctx, int verifyMode, bool incoming, Connection* conn);
 
 class OpenSSLContext {
@@ -38,7 +38,7 @@ private:
     static size_t ProcessHandshake(std::shared_ptr<OpenSSLContext> open, Connection* c, const char* data, size_t len);
     static size_t ProcessData(std::shared_ptr<OpenSSLContext> open, Connection* c, const char* data, size_t len);
 
-    std::function<size_t (Connection* c, const char* data, size_t)> logicProcess_;  // 逻辑处理
+    std::function<size_t (Connection* c, const char* data, size_t)> logicProcess_;
 
     SSL* ssl_; // ssl_st
     const bool incoming_;
@@ -54,9 +54,9 @@ private:
 };
 
 
-} // namespace ssl
+} // end namespace ssl
 
-} // namespace ananas
+} // end namespace ananas
 
 #endif
 

@@ -85,7 +85,7 @@ void  OMmapFile::Close() {
     }
 }
 
-bool    OMmapFile::Sync() {
+bool  OMmapFile::Sync() {
     if (file_ == kInvalidFile)
         return false;
 

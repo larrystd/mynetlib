@@ -87,6 +87,8 @@
         "__node_handle": "cpp",
         "*.inc": "cpp",
         "*.def": "cpp",
-        "local_type_traits": "cpp"
+        "local_type_traits": "cpp",
+        "barrier": "cpp",
+        "latch": "cpp"
     }
 }

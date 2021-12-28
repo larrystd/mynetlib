@@ -5,7 +5,8 @@
             "includePath": [
                 "${workspaceFolder}/**",
                 "/home/larry/myproject",
-                "/home/larry/myproject/ananas/rpclib"
+                "/home/larry/myproject/ananas/rpclib",
+                "/usr/local/openssl/include"
             ],
             "defines": [],
             "compilerPath": "/usr/bin/clang",

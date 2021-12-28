@@ -18,12 +18,14 @@ namespace ssl {
 
 OpenSSLContext::OpenSSLContext(SSL* ssl, bool incoming, void* data) :
     ssl_(ssl),
-    incoming_(incoming) {
+    incoming_(incoming)
+{
     SSL_set_ex_data(ssl_, 0, data);
 }
 
 OpenSSLContext::~OpenSSLContext() {
-    if (ssl_) SSL_free(ssl_);
+    if (ssl_) 
+        SSL_free(ssl_);
 }
 
 bool OpenSSLContext::SendData(const char* data, size_t len) {
@@ -31,13 +33,12 @@ bool OpenSSLContext::SendData(const char* data, size_t len) {
 
     if (len == 0)
         return true;
-
     bool driveByLoop = (!sendBuffer_.IsEmpty()) && (sendBuffer_.ReadAddr() == data);
 
     if (!driveByLoop && !sendBuffer_.IsEmpty()) {
         DBG(internal::g_debug) << "!driveByLoop && !sendBuffer_.IsEmpty()";
-        // may writeWaitReadable_ == true
-        sendBuffer_.PushData(data, len);
+
+        sendBuffer_.PushData(data, len); // 先把要发送的data放入缓冲区
         return true;
     }
 
@@ -45,23 +46,21 @@ bool OpenSSLContext::SendData(const char* data, size_t len) {
         DBG(internal::g_debug) << readWaitReadable_;
         assert (!writeWaitReadable_);
         sendBuffer_.PushData(data, len);
+
         return true;
     }
 
     ERR_clear_error();
+
     int ret = SSL_write(ssl_, data, len);
     if (ret <= 0) {
         int err = SSL_get_error(ssl_, ret);
-        assert (err != SSL_ERROR_WANT_WRITE);
+        assert (err != SSL_ERROR_WANT_WRITE); 
 
         WRN(internal::g_debug) << "SSL_write error: " << err << SSL_state_string_long(ssl_);
-
         if (err == SSL_ERROR_WANT_READ) {
-            // If active renegotiate, then call SSL_write,
-            // write to mem bio will always success, so there are some data to send.
-            // and return SSL_ERROR_WANT_READ, because I want your handshake response.
             writeWaitReadable_ = true;
-            if (!driveByLoop)
+            if (!driveByLoop) 
                 sendBuffer_.PushData(data, len);
         } else {
             return false;
@@ -74,38 +73,36 @@ bool OpenSSLContext::SendData(const char* data, size_t len) {
             sendBuffer_.Clear();
         } else {
             DBG(internal::g_debug) << "!driveByLoop && writeWaitReadable_ = false";
-        }
+        }        
     }
 
     Buffer buf = GetMemData(SSL_get_wbio(ssl_));
     if (!buf.IsEmpty()) {
-        DBG(internal::g_debug) << "SSL_write send bytes " << buf.ReadableSize() << ", and buffer has " << sendBuffer_.ReadableSize();
+        LOG_DBG(internal::g_debug) << "SSL_write send bytes" << buf.ReadableSize() << ", and buffer has " << sendBuffer_.ReadableSize();
 
-        auto c = (ananas::Connection*)SSL_get_ex_data(ssl_, 0);
+        auto c = (ananas::Connection*) SSL_get_ex_data(ssl_, 0);
         return c->SendPacket(buf.ReadAddr(), buf.ReadableSize());
     }
 
-    DBG(internal::g_debug) << "no data send";
-
+    LOG_DBG(internal::g_debug) << "no data send";
     return true;
 }
 
-void OpenSSLContext::SetLogicProcess(std::function<size_t (Connection*, const char*, size_t )> cb) {
+void OpenSSLContext::SetLogicProcess(std::function<size_t (Connection*, const char*, size_t)> cb) {
     logicProcess_ = std::move(cb);
 }
 
 Buffer OpenSSLContext::GetMemData(BIO* bio) {
     Buffer buf;
     while (true) {
-        buf.AssureSpace(16 * 1024);
+        buf.AssureSpace(16*1024);   // 16kbytes
+        // 读取buf到bio指向的内存块
         int bytes = BIO_read(bio, buf.WriteAddr(), buf.WritableSize());
         if (bytes <= 0)
             return buf;
-
-        buf.Produce(bytes);
+        buf.Produce(bytes); // 更改writeindex
     }
 
-    // never here
     return buf;
 }
 
@@ -117,17 +114,17 @@ size_t OpenSSLContext::ProcessHandshake(std::shared_ptr<OpenSSLContext> open, Co
     // process handshake
     int ret = open->incoming_ ? SSL_accept(ssl) : SSL_connect(ssl);
     if (ret == 1) {
-        DBG(internal::g_debug) << "ProcessHandshake is OK!";
-        //  handshake is OK, just for test.
+        LOG_DBG(internal::g_debug) << "ProcessHandShake is OK!";
+        // handshake is Ok,信息回调函数
         c->SetOnMessage(std::bind(&OpenSSLContext::ProcessData, open,
-                                  std::placeholders::_1,
-                                  std::placeholders::_2,
-                                  std::placeholders::_3));
+                                std::placeholders::_1, 
+                                std::placeholders::_2, 
+                                std::placeholders::_3));
     } else {
         int err = SSL_get_error(ssl, ret);
 
         if (err != SSL_ERROR_WANT_READ) {
-            DBG(internal::g_debug) << "SSL_connect failed " << err;
+            LOG_DBG(internal::g_debug) << "SSL_connect failed" << err;
             c->ActiveClose();
             return len;
         }
@@ -141,48 +138,46 @@ size_t OpenSSLContext::ProcessHandshake(std::shared_ptr<OpenSSLContext> open, Co
 }
 
 size_t OpenSSLContext::ProcessData(std::shared_ptr<OpenSSLContext> open, Connection* c, const char* data, size_t len) {
-    DBG(internal::g_debug) << "OpenSSLContext::onMessage len " << len;
+    LOG_DBG(internal::g_debug) << "OpenSSLContext::onMessage len " << len;
 
     // write back to ssl read buffer
     SSL* ssl = open->ssl_;
     BIO_write(SSL_get_rbio(ssl), data, len);
 
     if (open->writeWaitReadable_) {
-        DBG(internal::g_debug) << "Epollin, but writeWaitReadable_ == true";
+        LOG_DBG(internal::g_debug) << "Epollin, but writeWaitReadable_ == true";
         assert (!open->sendBuffer_.IsEmpty());
         if (!open->SendData(open->sendBuffer_.ReadAddr(), open->sendBuffer_.ReadableSize())) {
-            ERR(internal::g_debug) << "Epollin, but sendData failed";
+            LOG_ERR(internal::g_debug) << "Epollin, but sendData failed";
             c->ActiveClose();
         }
-
+        
         return len;
     } else {
         // read to plain text buffer, because ssl record may be split to multi packages
-        open->recvPlainBuf_.AssureSpace(16 * 1024);
+        open->recvPlainBuf_.AssureSpace(16*1024);
         ERR_clear_error();
+
         INF(internal::g_debug) << "SSL_read before state:" << SSL_state_string_long(ssl);
         int bytes = SSL_read(ssl, open->recvPlainBuf_.WriteAddr(), open->recvPlainBuf_.WritableSize());
         INF(internal::g_debug) << "SSL_read after state:" << SSL_state_string_long(ssl);
 
-        if (SSL_is_init_finished(ssl))
+        if (SSL_is_init_finished(ssl)) 
             USR(internal::g_debug) << "SSL_read finished true";
-
+        
         if (bytes > 0) {
             open->recvPlainBuf_.Produce(bytes);
             open->readWaitReadable_ = false;
             // now process logic packet
+            // 回调函数处理
             int processed = open->logicProcess_(c, open->recvPlainBuf_.ReadAddr(), open->recvPlainBuf_.ReadableSize());
             if (processed > 0)
                 open->recvPlainBuf_.Consume(processed);
-
-        } else {
+        } else {    // 似乎出现了错误
             int err = SSL_get_error(ssl, bytes);
 
-            // when peer issued renegotiation, here will demand us to send handshake data.
-            // write to mem bio will always success, only need to check whether has data to send.
-            assert (err != SSL_ERROR_WANT_WRITE);
-
-            WRN(internal::g_debug) << "SSL_read error " << err;
+            assert(err != SSL_ERROR_WANT_WRITE);
+                        WRN(internal::g_debug) << "SSL_read error " << err;
 
             if (err == SSL_ERROR_WANT_READ) {
                 // why report SSL_ERROR_WANT_READ when SSL_is_init_finished return 1?
@@ -203,11 +198,11 @@ size_t OpenSSLContext::ProcessData(std::shared_ptr<OpenSSLContext> open, Connect
             c->SendPacket(data.ReadAddr(), data.ReadableSize());
         }
     }
-
     return len;
 }
 
 bool OpenSSLContext::DoHandleShake() {
+
     if (!SSL_is_init_finished(ssl_)) {
         ERR(internal::g_debug) << "Can not DoHandleShake when SSL_is_init_finished 0";
         return false;
@@ -216,9 +211,9 @@ bool OpenSSLContext::DoHandleShake() {
     int ret = SSL_renegotiate(ssl_);
     INF(internal::g_debug) << "SSL_renegotiate ret " << ret;
 
-    if (ret != 1) return false;
+    if (ret != 1)   return false;
 
-    auto c = (ananas::Connection*)SSL_get_ex_data(ssl_, 0);
+    auto c = (ananas::Connection*) SSL_get_ex_data(ssl_, 0);
 
     if (incoming_) {
         // server side
@@ -229,14 +224,15 @@ bool OpenSSLContext::DoHandleShake() {
             c->ActiveClose();
             return false;
         } else {
-            //ssl_->state = SSL_ST_ACCEPT;
+            // ssl_->state = SSL_ST_ACCEPT
             INF(internal::g_debug) << "server SSL_ST_ACCEPT and state:" << SSL_state_string_long(ssl_);
         }
     }
 
     ret = SSL_do_handshake(ssl_);
-    DBG(internal::g_debug) << "SSL_do_handshake ret " << ret << " and state:" << SSL_state_string_long(ssl_);
-    if (ret <= 0) {
+    LOG_DBG(internal::g_debug) << "SSL_do_handshake ret " << ret << " and state:" << SSL_state_string_long(ssl_);
+
+    if (ret <= 0) { // 出错
         int err = SSL_get_error(ssl_, ret);
         INF(internal::g_debug) << "SSL_do_handshake error " << err;
         if (err != SSL_ERROR_WANT_READ) {
@@ -259,34 +255,36 @@ void OpenSSLContext::Shutdown() {
 
     if (err == 0)
         SSL_shutdown(ssl_);
-
     SSL_free(ssl_);
-    ssl_ = nullptr;
+    ssl_ = nullptr;  
 }
 
+// 新SSL 连接回调函数
 void OnNewSSLConnection(const std::string& ctxName, int verifyMode, bool incoming, Connection* c) {
     SSL_CTX* ctx = SSLManager::Instance().GetCtx(ctxName);
     if (!ctx) {
-        ERR(internal::g_debug) << "not find ctx " << ctxName;
+        ERR(internal::g_debug) << "not find ctx" << ctxName;
         c->ActiveClose();
         return;
     }
 
     SSL* ssl = SSL_new(ctx);
 
-    SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER); // allow retry ssl-write with different args
+    SSL_set_mode(ssl, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
     SSL_set_verify(ssl, verifyMode, NULL);
     SSL_set_bio(ssl, BIO_new(BIO_s_mem()), BIO_new(BIO_s_mem()));
 
     BIO_set_mem_eof_return(SSL_get_rbio(ssl), -1);
     BIO_set_mem_eof_return(SSL_get_wbio(ssl), -1);
 
-    auto open = std::make_shared<OpenSSLContext>(ssl, incoming, c);
+    auto open = std::make_shared<OpenSSLContext> (ssl, incoming, c);
+
+    // 设置了UserData
     c->SetUserData(open);
     c->SetOnDisconnect(std::bind([](OpenSSLContext* ctx, Connection* c) {
         ctx->Shutdown();
     }, open.get(), std::placeholders::_1));
-#if 0
+#ifdef 1
     open->SetLogicProcess([](Connection* c, const char* data, size_t len) {
         DBG(internal::g_debug) << "Process len " << len;
         DBG(internal::g_debug) << "Process data " << data;
@@ -296,15 +294,18 @@ void OnNewSSLConnection(const std::string& ctxName, int verifyMode, bool incomin
 
     const int kSSLHeadSize = 5;
     c->SetMinPacketSize(kSSLHeadSize);
+
+    // 信息传递
     c->SetOnMessage(std::bind(&OpenSSLContext::ProcessHandshake, open,
-                              std::placeholders::_1,
-                              std::placeholders::_2,
-                              std::placeholders::_3));
+                    std::placeholders::_1,
+                    std::placeholders::_2,
+                    std::placeholders::_3));
+
 
     int ret = incoming ? SSL_accept(ssl) : SSL_connect(ssl);
     if (ret <= 0) {
-        int err = SSL_get_error(ssl, ret);
-
+        int err = SSL_get_error (ssl, ret);
+        
         if (err != SSL_ERROR_WANT_READ) {
             ERR(internal::g_debug) << "SSL_connect failed " << err;
             c->ActiveClose();
@@ -312,14 +313,13 @@ void OnNewSSLConnection(const std::string& ctxName, int verifyMode, bool incomin
         }
     }
 
-    // use mem bio, can't success for now
-    assert (ret != 1);
+    assert(ret != 1);
 
-    // send the encrypt data from write buffer
+    // send the encrypt data from write buffer， 数据
     Buffer data = OpenSSLContext::GetMemData(SSL_get_wbio(ssl));
     c->SendPacket(data.ReadAddr(), data.ReadableSize());
 
-    // !!!  test ssl_write when renegotiate !!!
+// !!!  test ssl_write when renegotiate !!!
 #ifdef TEST_SSL_RENEGO
     if (!incoming)
         return;

@@ -449,9 +449,9 @@ bool Logger::Update() {
     return todo;
 }
 
-void   Logger::_Reset() {
+void Logger::_Reset() {
     curLevel_ = 0;
-    pos_  = kPrefixLevelLen + kPrefixTimeLen ;
+    pos_ = kPrefixLevelLen + kPrefixTimeLen;
 }
 
 size_t  Logger::_Log(const char* data, size_t dataLen) {
@@ -472,7 +472,6 @@ size_t  Logger::_Log(const char* data, size_t dataLen) {
 
     return nOffset;
 }
-
 
 void Logger::_WriteLog(int level, size_t len, const char* data) {
     assert (len > 0 && data);
@@ -549,7 +548,7 @@ void LogManager::Start() {
     shutdown_ = false;
 
     auto io = std::bind(&LogManager::Run, this);
-    iothread_ = std::thread{std::move(io)};
+    iothread_ = std::thread{std::move(io)}; // 用一个线程来执行io function, 即LogManager::Run
 }
 
 void LogManager::Stop() {
@@ -615,10 +614,9 @@ void LogManager::Run() {
     bool run = true;
     while (run) {
         std::vector<Logger* > tmpBusy;
-
         {
-            std::unique_lock<std::mutex> guard(mutex_);
-            cond_.wait_for(guard, kFlushInterval);
+            std::unique_lock<std::mutex> guard(mutex_); // 获得锁
+            cond_.wait_for(guard, kFlushInterval);  // 定期执行, 等待kFlushInterval
             if (!busyLogs_.empty()) {
                 tmpBusy.assign(busyLogs_.begin(), busyLogs_.end());
                 busyLogs_.clear();
